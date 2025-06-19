@@ -30,6 +30,8 @@ cd build
 make
 ```
 
+* Если собирать без маркера `-DENABLE_COVERAGE=ON` - будет треш в терминале
+
 4. Подготовка файлов покрытия
 
 ```cmd
@@ -41,4 +43,3 @@ make coverage
 ```cmd
 ./TransformationServer.out 127.0.0.1 34100 127.0.0.1 34000
 ```
-
