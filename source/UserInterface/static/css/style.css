@@ -1,0 +1,68 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+
+.app-container {
+    display: flex;
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 70px);
+    grid-template-rows: repeat(5, 70px);
+    gap: 5px;
+}
+
+.grid-button {
+    width: 100%;
+    height: 100%;
+    font-size: 18px;
+    font-weight: bold;
+    border: 2px solid #444;
+    border-radius: 8px;
+    background-color: #e0e0e0;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.grid-button:hover {
+    background-color: #d0d0d0;
+    transform: scale(1.05);
+}
+
+.empty-cell {
+    width: 100%;
+    height: 100%;
+    background-color: transparent;
+}
+
+.output-panel {
+    width: 300px;
+    padding: 15px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.log-container {
+    height: 400px;
+    overflow-y: auto;
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.log-entry {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+}

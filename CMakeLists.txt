@@ -74,7 +74,6 @@ add_executable(MotorControlService.out
     source/MotorControlService/main.cpp
     source/MotorControlService/MotorControlServiceCore.cpp
     source/UniversalServerUnits/utils.cpp
-    source/ModuleFT232RL/exceptions.cpp
     source/ModuleFT232RL/ModuleFT232RL.cpp
     source/UniversalServerUnits/Exceptions.cpp
     source/UniversalServerUnits/SocketWrapper.cpp
