@@ -4,7 +4,7 @@
 
 //// split
 
-TEST( splitTest, EmptyString )
+TEST(splitTest, EmptyString)
 {
     UniversalServerMethods serverMethods;
     const std::string input = "";
@@ -13,82 +13,80 @@ TEST( splitTest, EmptyString )
     EXPECT_EQ(result, expected);
 }
 
-TEST( splitTest, NoDelimiters )
+TEST(splitTest, NoDelimiters)
 {
     UniversalServerMethods serverMethods;
     const std::string input = "single message";
-    std::vector<std::string> expected = { "single message" };
-    auto result = serverMethods.split(input);
-    EXPECT_EQ( result, expected );
-}
-
-TEST( splitTest, SingleDelimiterAtEnd )
-{
-    UniversalServerMethods serverMethods;
-    const std::string input = "message\n\n";
-    std::vector<std::string> expected = { "message" };
+    std::vector<std::string> expected = {"single message"};
     auto result = serverMethods.split(input);
     EXPECT_EQ(result, expected);
 }
 
-TEST( splitTest, SingleDelimiterInMiddle )
+TEST(splitTest, SingleDelimiterAtEnd)
+{
+    UniversalServerMethods serverMethods;
+    const std::string input = "message\n\n";
+    std::vector<std::string> expected = {"message"};
+    auto result = serverMethods.split(input);
+    EXPECT_EQ(result, expected);
+}
+
+TEST(splitTest, SingleDelimiterInMiddle)
 {
     UniversalServerMethods serverMethods;
     const std::string input = "first\n\nsecond";
     std::vector<std::string> expected = {"first", "second"};
     auto result = serverMethods.split(input);
-    EXPECT_EQ( result, expected );
+    EXPECT_EQ(result, expected);
 }
 
-TEST( splitTest, MultipleDelimiters )
+TEST(splitTest, MultipleDelimiters)
 {
     UniversalServerMethods serverMethods;
     const std::string input = "first\n\nsecond\n\nthird";
-    std::vector<std::string> expected = { "first", "second", "third" };
+    std::vector<std::string> expected = {"first", "second", "third"};
     auto result = serverMethods.split(input);
-    EXPECT_EQ( result, expected );
+    EXPECT_EQ(result, expected);
 }
 
-TEST( splitTest, ConsecutiveDelimiters )
+TEST(splitTest, ConsecutiveDelimiters)
 {
     UniversalServerMethods serverMethods;
     const std::string input = "first\n\n\n\nsecond";
-    std::vector<std::string> expected = { "first", "second" };
+    std::vector<std::string> expected = {"first", "second"};
     auto result = serverMethods.split(input);
-    EXPECT_EQ( result, expected );
+    EXPECT_EQ(result, expected);
 }
 
-TEST( splitTest, DelimiterAtStart )
+TEST(splitTest, DelimiterAtStart)
 {
     UniversalServerMethods serverMethods;
     const std::string input = "\n\nmessage";
-    std::vector<std::string> expected = { "message" };
+    std::vector<std::string> expected = {"message"};
     auto result = serverMethods.split(input);
-    EXPECT_EQ( result, expected );
+    EXPECT_EQ(result, expected);
 }
 
-TEST( splitTest, OnlyDelimiters )
+TEST(splitTest, OnlyDelimiters)
 {
     UniversalServerMethods serverMethods;
     const std::string input = "\n\n\n\n";
     std::vector<std::string> expected = {};
     auto result = serverMethods.split(input);
-    EXPECT_EQ( result, expected );
+    EXPECT_EQ(result, expected);
 }
 
-TEST( splitTest, OneDelimiters )
+TEST(splitTest, OneDelimiters)
 {
     UniversalServerMethods serverMethods;
     const std::string input = "\n\n\n";
-    std::vector<std::string> expected = { "\n" };
+    std::vector<std::string> expected = {"\n"};
     auto result = serverMethods.split(input);
-    EXPECT_EQ( result, expected );
+    EXPECT_EQ(result, expected);
 }
 
-int main( int argc, char **argv )
+int main(int argc, char **argv)
 {
-    testing::InitGoogleTest( &argc, argv );
+    testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-
-

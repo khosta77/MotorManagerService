@@ -17,8 +17,8 @@ public:
     int port_;
 
     IpFromMainInput() = delete;
-    IpFromMainInput( int argc, char* argv[] );
+    IpFromMainInput(int argc, char* argv[]);
     ~IpFromMainInput();
 };
 
-#endif  // UTILS_HPP_
+#endif // UTILS_HPP_

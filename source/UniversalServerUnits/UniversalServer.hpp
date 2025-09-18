@@ -28,8 +28,8 @@ class UniversalServer : protected UniversalServerMethods
 private:
     const int MAX_CLIENTS = 1024;
 
-    std::unique_ptr<int[]> clients_fds_ = std::make_unique<int[]>( MAX_CLIENTS );
-    std::unique_ptr<struct pollfd[]> fds_ = std::make_unique<struct pollfd[]>( ( MAX_CLIENTS + 1 ) );
+    std::unique_ptr<int[]> clients_fds_ = std::make_unique<int[]>(MAX_CLIENTS);
+    std::unique_ptr<struct pollfd[]> fds_ = std::make_unique<struct pollfd[]>((MAX_CLIENTS + 1));
 
     std::unordered_map<int, std::string> clients_name_;
 
@@ -64,12 +64,12 @@ private:
     /*
      * @brief Метод для закрытия сокетов, если сообщения пустые
      * */
-    bool ifMessageEmptyCloseSocket( const int );
+    bool ifMessageEmptyCloseSocket(const int);
 
     /*
      * @brief надо проверить при первом подключении, что, тот с кем хотим работать имеет имя
      * */
-    bool get_WhoAmI_Info( const int, std::string& );
+    bool get_WhoAmI_Info(const int, std::string&);
 
     /*
      * @brief когда проверки доходят до этого метода можно быть увереным, что у нас 'сообщение'
@@ -80,7 +80,7 @@ private:
      *
      * Декодирование сообщения соответсвенно происходит в ядре.
      * */
-    void processTheRequest( const int, std::string& );
+    void processTheRequest(const int, std::string&);
 
     /*
      * @brief checkingSocketsOnNewContent - проверяет какие сообщения пришли от сокетов пользователей
@@ -88,11 +88,11 @@ private:
     void checkingSocketsOnNewContent();
 
 public:
-    UniversalServer( const std::string&, const int&,  std::unique_ptr<UniversalServerCore> );
-    UniversalServer( const UniversalServer& ) = delete;
-    UniversalServer( UniversalServer&& ) = delete;
-    UniversalServer& operator=( const UniversalServer& ) = delete;
-    UniversalServer& operator=( UniversalServer&& ) = delete;
+    UniversalServer(const std::string&, const int&, std::unique_ptr<UniversalServerCore>);
+    UniversalServer(const UniversalServer&) = delete;
+    UniversalServer(UniversalServer&&) = delete;
+    UniversalServer& operator=(const UniversalServer&) = delete;
+    UniversalServer& operator=(UniversalServer&&) = delete;
     ~UniversalServer();
 
     /*
@@ -106,4 +106,4 @@ public:
     void stop();
 };
 
-#endif  // SERVER_HPP_
+#endif // SERVER_HPP_

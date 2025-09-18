@@ -8,8 +8,8 @@
 class SocketWrapper : public SocketInterface
 {
 public:
-    size_t write( int fd, const void* buf, size_t count ) override;
-    size_t read( int fd, void* buf, size_t count ) override;
+    size_t write(int fd, const void* buf, size_t count) override;
+    size_t read(int fd, void* buf, size_t count) override;
 };
 
-#endif  // SOCKETWRAPPER_HPP_
+#endif // SOCKETWRAPPER_HPP_

@@ -10,15 +10,12 @@
  * */
 class UniversalServerCore
 {
-  private:
-  protected:
-  public:
+private:
+protected:
+public:
     std::string serverName_;
 
-    UniversalServerCore( const std::string &serverName )
-        : serverName_( serverName )
-    {
-    }
+    UniversalServerCore(const std::string &serverName) : serverName_(serverName) {}
     /*
      * @brief чтобы не забыли
      * */
@@ -38,8 +35,7 @@ class UniversalServerCore
      * @param 3 - сообщение, это закодированная строка, в ней может быть все что
      * угодно.
      * */
-    virtual void Process( const int, const std::string &,
-                          const std::string & ) = 0;
+    virtual void Process(const int, const std::string &, const std::string &) = 0;
 
     /*
      * @brief запуск каго-то внутреннего действия
