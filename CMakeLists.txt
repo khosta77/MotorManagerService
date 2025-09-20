@@ -1,17 +1,23 @@
 cmake_minimum_required(VERSION 3.28)
-project(MotorManagerService)
+project(MotorManagerService LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(BUILD_TESTS "Build tests" ON)
-option(ENABLE_COVERAGE "Enable code coverage reporting" ON)
+set(FTD2XX_DIR "${CMAKE_CURRENT_SOURCE_DIR}/driver/ftd2xxlib")
+set(FTD2XX_LIB "${CMAKE_CURRENT_SOURCE_DIR}/driver/libftd2xx.dylib")
+set(FTD2XX_BLB "${CMAKE_CURRENT_SOURCE_DIR}/build/libftd2xx.dylib")
+
+set(BUILD_TESTS ON)
+set(ENABLE_COVERAGE OFF)
 
 if(ENABLE_COVERAGE)
     add_compile_options(--coverage)
     add_link_options(--coverage)
 
     message(STATUS "coverage (ON)")
+else()
+    message(STATUS "coverage (OFF)")
 endif()
 
 if(APPLE)
@@ -19,6 +25,12 @@ if(APPLE)
 else()
     find_package(Boost REQUIRED)
     find_package(GTest REQUIRED)
+endif()
+
+if(NOT EXISTS "${FTD2XX_LIB}")
+    message(FATAL_ERROR "libftd2xx.dylib not found at: ${FTD2XX_LIB}")
+else()
+    message(STATUS "Found libftd2xx: ${FTD2XX_LIB}")
 endif()
 
 add_compile_options(-Werror)
