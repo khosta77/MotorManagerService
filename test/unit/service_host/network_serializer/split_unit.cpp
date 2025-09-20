@@ -1,4 +1,4 @@
-#include "UniversalServer.hpp"
+#include "network_serializer.hpp"
 
 #include <gtest/gtest.h>
 
@@ -6,7 +6,7 @@
 
 TEST(splitTest, EmptyString)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     const std::string input = "";
     std::vector<std::string> expected = {};
     auto result = serverMethods.split(input);
@@ -15,7 +15,7 @@ TEST(splitTest, EmptyString)
 
 TEST(splitTest, NoDelimiters)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     const std::string input = "single message";
     std::vector<std::string> expected = {"single message"};
     auto result = serverMethods.split(input);
@@ -24,7 +24,7 @@ TEST(splitTest, NoDelimiters)
 
 TEST(splitTest, SingleDelimiterAtEnd)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     const std::string input = "message\n\n";
     std::vector<std::string> expected = {"message"};
     auto result = serverMethods.split(input);
@@ -33,7 +33,7 @@ TEST(splitTest, SingleDelimiterAtEnd)
 
 TEST(splitTest, SingleDelimiterInMiddle)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     const std::string input = "first\n\nsecond";
     std::vector<std::string> expected = {"first", "second"};
     auto result = serverMethods.split(input);
@@ -42,7 +42,7 @@ TEST(splitTest, SingleDelimiterInMiddle)
 
 TEST(splitTest, MultipleDelimiters)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     const std::string input = "first\n\nsecond\n\nthird";
     std::vector<std::string> expected = {"first", "second", "third"};
     auto result = serverMethods.split(input);
@@ -51,7 +51,7 @@ TEST(splitTest, MultipleDelimiters)
 
 TEST(splitTest, ConsecutiveDelimiters)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     const std::string input = "first\n\n\n\nsecond";
     std::vector<std::string> expected = {"first", "second"};
     auto result = serverMethods.split(input);
@@ -60,7 +60,7 @@ TEST(splitTest, ConsecutiveDelimiters)
 
 TEST(splitTest, DelimiterAtStart)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     const std::string input = "\n\nmessage";
     std::vector<std::string> expected = {"message"};
     auto result = serverMethods.split(input);
@@ -69,7 +69,7 @@ TEST(splitTest, DelimiterAtStart)
 
 TEST(splitTest, OnlyDelimiters)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     const std::string input = "\n\n\n\n";
     std::vector<std::string> expected = {};
     auto result = serverMethods.split(input);
@@ -78,15 +78,10 @@ TEST(splitTest, OnlyDelimiters)
 
 TEST(splitTest, OneDelimiters)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     const std::string input = "\n\n\n";
     std::vector<std::string> expected = {"\n"};
     auto result = serverMethods.split(input);
     EXPECT_EQ(result, expected);
 }
 
-int main(int argc, char **argv)
-{
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

@@ -22,14 +22,8 @@ if(BUILD_TESTS)
     add_subdirectory(test)
 
     add_custom_target(run_tests
-        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --progress --verbose
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
         VERBATIM
     )
     add_dependencies(run_tests all_unit_tests)
-    #add_custom_target(test_1
-    #    COMMAND
-    #        ${CMAKE_CTEST_COMMAND} -R "Exceptions_tests" --output-on-failure
-    #    VERBATIM
-    #)
-    #add_dependencies(test_1 exceptions_tests)
 endif()

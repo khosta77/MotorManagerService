@@ -1,11 +1,11 @@
-#include "UniversalServer.hpp"
+#include "network_serializer.hpp"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
 #include <future>
 
-class SocketMock : public SocketInterface
+class SocketMock : public ISocket
 {
 public:
     MOCK_METHOD(size_t, write, (int fd, const void* buf, size_t count), (override));
@@ -39,7 +39,7 @@ TEST(readFromSockTest, ZeroReadTest)
             return static_cast<ssize_t>(bytes_to_copy);
         }));
 
-    UniversalServerMethods server(std::move(mockSocket));
+    NetworkSerializer server(std::move(mockSocket));
 
     std::string result = server.readFromSock(0);
     EXPECT_EQ(result, test_data);
@@ -70,7 +70,7 @@ TEST(readFromSockTest, BasicReadTest)
             return static_cast<ssize_t>(bytes_to_copy);
         }));
 
-    UniversalServerMethods server(std::move(mockSocket));
+    NetworkSerializer server(std::move(mockSocket));
 
     std::string result = server.readFromSock(0);
     EXPECT_EQ(result, test_data);
@@ -102,7 +102,7 @@ TEST(readFromSockTest, ReadTestOnBorders)
             return static_cast<ssize_t>(bytes_to_copy);
         }));
 
-    UniversalServerMethods server(std::move(mockSocket));
+    NetworkSerializer server(std::move(mockSocket));
 
     std::string result = server.readFromSock(0);
     EXPECT_EQ(result, test_data);
@@ -116,13 +116,8 @@ TEST(readFromSockTest, WriteError)
 
     EXPECT_CALL(*mockPtr, read(testing::_, testing::_, testing::_)).WillOnce(testing::Return(-1));
 
-    UniversalServerMethods server(std::move(mockSocket));
+    NetworkSerializer server(std::move(mockSocket));
 
     EXPECT_THROW(server.readFromSock(1), ErrorReadingFromSocket);
 }
 
-int main(int argc, char** argv)
-{
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

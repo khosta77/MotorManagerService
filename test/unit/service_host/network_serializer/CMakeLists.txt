@@ -1,9 +1,10 @@
-set(TEST_NAME mms_service_host_exceptions_unit_tests)
-file(GLOB EXCEPTIONS_TEST_SOURCES "exceptions_*.cpp")
+set(TEST_NAME mms_service_host_network_serializer_unit_tests)
+file(GLOB EXCEPTIONS_TEST_SOURCES "*.cpp")
 
 add_executable(${TEST_NAME} ${EXCEPTIONS_TEST_SOURCES})
 target_include_directories(${TEST_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include/service_host)
 target_link_libraries(${TEST_NAME}
+    GTest::gmock
     GTest::gtest_main
     service_host
 )

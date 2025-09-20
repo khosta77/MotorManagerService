@@ -1,9 +1,9 @@
-#include "UniversalServer.hpp"
+#include "network_serializer.hpp"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-class SocketMock : public SocketInterface
+class SocketMock : public ISocket
 {
 public:
     MOCK_METHOD(size_t, write, (int fd, const void* buf, size_t count), (override));
@@ -20,7 +20,7 @@ TEST(WriteToSockTest, Success)
         .WillOnce(testing::Return(10))
         .WillOnce(testing::Return(5));
 
-    UniversalServerMethods server(std::move(mockSocket));
+    NetworkSerializer server(std::move(mockSocket));
 
     EXPECT_NO_THROW(server.writeToSock(1, "123456789"));
 }
@@ -28,8 +28,7 @@ TEST(WriteToSockTest, Success)
 // Сообщение уже содержит \n\n - должно бросить исключение
 TEST(WriteToSockTest, InvalidMessage)
 {
-    UniversalServerMethods server;
-
+    NetworkSerializer server;
     EXPECT_THROW(server.writeToSock(1, "invalid\n\nmessage"), NotCorrectMessageToSend);
 }
 
@@ -41,7 +40,7 @@ TEST(WriteToSockTest, WriteToSock_WriteError)
 
     EXPECT_CALL(*mockPtr, write(testing::_, testing::_, testing::_)).WillOnce(testing::Return(-1));
 
-    UniversalServerMethods server(std::move(mockSocket));
+    NetworkSerializer server(std::move(mockSocket));
 
     EXPECT_THROW(server.writeToSock(1, "test"), ErrorWritingToSocket);
 }
@@ -56,7 +55,7 @@ TEST(WriteToSockTest, CorrectBuffer)
     EXPECT_CALL(*mockPtr, write(testing::_, testing::_, testing::_))
         .WillOnce(testing::DoAll(testing::SaveArg<1>(&savedBuf), testing::Return(15)));
 
-    UniversalServerMethods server(std::move(mockSocket));
+    NetworkSerializer server(std::move(mockSocket));
 
     std::string msg = "123456789";
     server.writeToSock(1, msg);
@@ -66,8 +65,3 @@ TEST(WriteToSockTest, CorrectBuffer)
     EXPECT_EQ(buf, msg);
 }
 
-int main(int argc, char** argv)
-{
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

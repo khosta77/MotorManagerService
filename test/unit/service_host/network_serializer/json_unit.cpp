@@ -1,14 +1,12 @@
-#include "UniversalServer.hpp"
+#include "network_serializer.hpp"
 
 #include <gtest/gtest.h>
-
-//// serialize & deserialize
 
 BOOST_FUSION_DEFINE_STRUCT((pkg), Ranks, (int, r1)(int, r2)(int, r3)(std::string, some_str))
 
 TEST(JsonBoostFusionTest, RanksBasicSerialization)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     pkg::Ranks ranks = {1, 2, 3, "example"};
     std::string json_str = serverMethods.serialize(ranks);
     EXPECT_EQ(json_str, "{\"r1\":1,\"r2\":2,\"r3\":3,\"some_str\":\"example\"}");
@@ -29,7 +27,7 @@ BOOST_FUSION_DEFINE_STRUCT((pkg), S4, (bool, val))
 
 TEST(JsonBoostFusionTest, RanksBasicDeserialization)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     std::string json_str = "{\"r1\":1,\"r2\":2,\"r3\":3,\"some_str\":\"example\"}";
     auto deserialized_ranks = serverMethods.deserialize<pkg::Ranks>(json_str);
     EXPECT_EQ(deserialized_ranks.r1, 1);
@@ -40,7 +38,7 @@ TEST(JsonBoostFusionTest, RanksBasicDeserialization)
 
 TEST(JsonBoostFusionTest, NestedStructSerialization)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     pkg::S1 s1_0(1);
     pkg::S1 s1_1(2);
     pkg::S2 s2(1.2200000286102295);
@@ -60,7 +58,7 @@ TEST(JsonBoostFusionTest, NestedStructSerialization)
 
 TEST(JsonBoostFusionTest, NestedStructDeserialization)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     std::string json_str =
         "{\"r1\":123,\"r2\":1.2300000190734863,\"s1_vals\":[{\"r0\":1},{\"r0\":2}],\"s2_val\":{\"val\":1.2200000286102295},\"some_str\":\"abcde\",\"vals\":[1,2,3]}";
     auto deserialized_s3 = serverMethods.deserialize<pkg::S3>(json_str);
@@ -83,7 +81,7 @@ TEST(JsonBoostFusionTest, NestedStructDeserialization)
 
 TEST(JsonBoostFusionTest, BoolSerialization)
 {
-    // UniversalServerMethods serverMethods;
+    // NetworkSerializer serverMethods;
     //  Этот тест остаётся закомментированным, как в оригинале
     //  pkg::S4 s4(true);
     //  std::string json_str = Serialize(s4);
@@ -92,20 +90,15 @@ TEST(JsonBoostFusionTest, BoolSerialization)
 
 TEST(JsonBoostFusionTest, ExtraFieldError)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     std::string json_str = "{\"r1\":1,\"r2\":2,\"r3\":3,\"r4\":4,\"some_str\":\"example\"}";
     EXPECT_THROW(serverMethods.deserialize<pkg::Ranks>(json_str), DeserializeJsonElementSomeProblem);
 }
 
 TEST(JsonBoostFusionTest, MissingFieldError)
 {
-    UniversalServerMethods serverMethods;
+    NetworkSerializer serverMethods;
     std::string json_str = "{\"r1\":1,\"r2\":2,\"some_str\":\"example\"}";
     EXPECT_THROW(serverMethods.deserialize<pkg::Ranks>(json_str), DeserializeJsonNoKey);
 }
 
-int main(int argc, char **argv)
-{
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
