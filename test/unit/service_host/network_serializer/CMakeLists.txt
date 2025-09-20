@@ -4,10 +4,13 @@ file(GLOB EXCEPTIONS_TEST_SOURCES "*.cpp")
 add_executable(${TEST_NAME} ${EXCEPTIONS_TEST_SOURCES})
 target_include_directories(${TEST_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include/service_host)
 target_link_libraries(${TEST_NAME}
-    GTest::gmock
-    GTest::gtest_main
-    service_host
+    PRIVATE
+        GTest::gmock
+        GTest::gtest_main
+        service_host
+        -fprofile-generate
 )
+target_compile_options(${TEST_NAME} PUBLIC ${COVERAGE_FLAGS})
 
 add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 set(TEST_TARGET_NAME ${TEST_NAME} PARENT_SCOPE)

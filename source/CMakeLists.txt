@@ -1,15 +1,17 @@
 # Библиотека service_host
-add_library(service_host STATIC
-    service_host/exceptions.cpp
-    service_host/network_serializer.cpp
-    service_host/server.cpp
-    service_host/socket.cpp
-    service_host/utils.cpp
+add_library(service_host
+    STATIC
+        service_host/exceptions.cpp
+        service_host/network_serializer.cpp
+        service_host/server.cpp
+        service_host/socket.cpp
+        service_host/utils.cpp
 )
 
-target_include_directories(service_host PUBLIC
-    ${CMAKE_SOURCE_DIR}/json/single_include
-    ${CMAKE_SOURCE_DIR}/include/service_host
+target_include_directories(service_host
+    PUBLIC
+        ${CMAKE_SOURCE_DIR}/json/single_include
+        ${CMAKE_SOURCE_DIR}/include/service_host
 )
 
 # Библиотека core
