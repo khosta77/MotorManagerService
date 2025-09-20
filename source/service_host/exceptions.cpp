@@ -1,4 +1,4 @@
-#include "Exceptions.hpp"
+#include "exceptions.hpp"
 
 MyException::MyException(const std::string &msg) : m_msg(msg) {}
 

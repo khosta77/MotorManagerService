@@ -1,6 +1,6 @@
-#include "UniversalServer.hpp"
+#include "server.hpp"
 
-void UniversalServer::launchServer()
+void Server::launchServer()
 {
     if (int listenCode = listen(server_fd_, SOMAXCONN); listenCode)
     {
@@ -11,7 +11,7 @@ void UniversalServer::launchServer()
     std::cout << std::format("Server \'{}\' launch: {}:{}", core_->serverName_, ip_, port_) << std::endl;
 }
 
-void UniversalServer::settingsFileDescriptor()
+void Server::settingsFileDescriptor()
 {
     // Настраиваем массив pollfd
     fds_[0].fd = server_fd_;
@@ -24,7 +24,7 @@ void UniversalServer::settingsFileDescriptor()
     }
 }
 
-void UniversalServer::checkingSocketsOnNewConnect()
+void Server::checkingSocketsOnNewConnect()
 {
     if ((fds_[0].revents & POLLIN))
     {
@@ -39,7 +39,7 @@ void UniversalServer::checkingSocketsOnNewConnect()
     }
 }
 
-bool UniversalServer::ifMessageEmptyCloseSocket(const int i)
+bool Server::ifMessageEmptyCloseSocket(const int i)
 {
     for (auto client = clients_name_.begin(); client != clients_name_.end(); ++client)
     {
@@ -54,7 +54,7 @@ bool UniversalServer::ifMessageEmptyCloseSocket(const int i)
     return true;
 }
 
-bool UniversalServer::get_WhoAmI_Info(const int i, std::string& message)
+bool Server::get_WhoAmI_Info(const int i, std::string& message)
 {
     if (clients_name_.count(fds_[i].fd))
         return false;
@@ -77,7 +77,7 @@ bool UniversalServer::get_WhoAmI_Info(const int i, std::string& message)
     return true;
 }
 
-void UniversalServer::processTheRequest([[maybe_unused]] const int i, [[maybe_unused]] std::string& message)
+void Server::processTheRequest([[maybe_unused]] const int i, [[maybe_unused]] std::string& message)
 {
     try
     {
@@ -89,7 +89,7 @@ void UniversalServer::processTheRequest([[maybe_unused]] const int i, [[maybe_un
     }
 }
 
-void UniversalServer::checkingSocketsOnNewContent()
+void Server::checkingSocketsOnNewContent()
 {
     for (int i = 1; i < nfds_; ++i)
     {
@@ -122,11 +122,8 @@ void UniversalServer::checkingSocketsOnNewContent()
     }
 }
 
-UniversalServer::UniversalServer(
-    const std::string& IP,
-    const int& PORT,
-    std::unique_ptr<UniversalServerCore> core)
-    : UniversalServerMethods()
+Server::Server(const std::string& IP, const int& PORT, std::unique_ptr<ICore> core)
+    : NetworkSerializer()
     , ip_(IP)
     , port_(PORT)
     , core_(std::move(core))
@@ -147,7 +144,7 @@ UniversalServer::UniversalServer(
     }
 }
 
-UniversalServer::~UniversalServer()
+Server::~Server()
 {
     close(server_fd_);
     for (int i = 1; i < nfds_; i++)
@@ -157,7 +154,7 @@ UniversalServer::~UniversalServer()
     }
 }
 
-int UniversalServer::run()
+int Server::run()
 {
     serverWorkStatus_ = false;
     core_->Init();
@@ -180,7 +177,7 @@ int UniversalServer::run()
     return 0;
 }
 
-void UniversalServer::stop()
+void Server::stop()
 {
     serverWorkStatus_ = true;
 }

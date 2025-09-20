@@ -1,16 +1,14 @@
-#include "UniversalServerUnits.hpp"
+#include "network_serializer.hpp"
 
-UniversalServerMethods::UniversalServerMethods()
-    : MAX_BUFFER_COUNT(1024)
-    , socketInterface_(std::make_unique<SocketWrapper>())
+NetworkSerializer::NetworkSerializer() : MAX_BUFFER_COUNT(1024), socketInterface_(std::make_unique<Socket>())
 {}
 
-UniversalServerMethods::UniversalServerMethods(std::unique_ptr<SocketInterface> socketmock)
+NetworkSerializer::NetworkSerializer(std::unique_ptr<ISocket> socketmock)
     : MAX_BUFFER_COUNT(1024)
     , socketInterface_(std::move(socketmock))
 {}
 
-std::string UniversalServerMethods::readFromSock(const int socket_)
+std::string NetworkSerializer::readFromSock(const int socket_)
 {
     std::string rxData;
     std::vector<char> buffer(MAX_BUFFER_COUNT, 0);
@@ -40,7 +38,7 @@ std::string UniversalServerMethods::readFromSock(const int socket_)
     return rxData;
 }
 
-void UniversalServerMethods::writeToSock(const int socket_, std::string msg)
+void NetworkSerializer::writeToSock(const int socket_, std::string msg)
 {
     if (msg.find("\n\n") != std::string::npos)
         throw NotCorrectMessageToSend();
@@ -60,7 +58,7 @@ void UniversalServerMethods::writeToSock(const int socket_, std::string msg)
     }
 }
 
-std::vector<std::string> UniversalServerMethods::split(const std::string& message)
+std::vector<std::string> NetworkSerializer::split(const std::string& message)
 {
     std::vector<std::string> result;
     size_t start = 0;
