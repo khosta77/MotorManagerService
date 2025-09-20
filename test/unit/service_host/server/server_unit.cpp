@@ -1,16 +1,13 @@
-#include "UniversalServer.hpp"
+#include "server.hpp"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
 #include <future>
 
-//// UniversalServer
+constexpr int TEST_PORT = 85201;
 
-// Что-то все порты заняты((((
-const int TEST_PORT = 85201;
-
-class Writer : public UniversalServerMethods
+class Writer : public NetworkSerializer
 {
 private:
     const std::string my_name_;
@@ -58,8 +55,7 @@ public:
         const std::string& IP = "127.0.0.1",
         const int& PORT = TEST_PORT,
         const std::string& MY_NAME = "Tester")
-        : UniversalServerMethods()
-        , my_name_(MY_NAME)
+        : my_name_(MY_NAME)
     {
         socketInit();
         fillAddress(IP, PORT);
@@ -79,10 +75,10 @@ public:
     }
 };
 
-class MockCore : public UniversalServerCore
+class MockCore : public ICore
 {
 public:
-    MockCore() : UniversalServerCore("MockCore") {}
+    MockCore() : ICore("MockCore") {}
     ~MockCore() override = default;
 
     void Init() override {}
@@ -92,14 +88,14 @@ public:
 };
 
 
-TEST(UniversalServerTest, MethodCalls)
+TEST(ServerTest, MethodCalls)
 {
     auto mockCore = std::make_unique<MockCore>();
 
     MockCore* mockPtr = mockCore.get();
     EXPECT_CALL(*mockPtr, Process(testing::_, testing::_, testing::_)).Times(1);
 
-    UniversalServer server("127.0.0.1", TEST_PORT, std::move(mockCore));
+    Server server("127.0.0.1", TEST_PORT, std::move(mockCore));
     std::future<int> server_status = std::async(std::launch::async, [&]() { return server.run(); });
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
@@ -114,14 +110,14 @@ TEST(UniversalServerTest, MethodCalls)
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 }
 
-TEST(UniversalServerTest, MethodCallsAndClose)
+TEST(ServerTest, MethodCallsAndClose)
 {
     auto mockCore = std::make_unique<MockCore>();
 
     MockCore* mockPtr = mockCore.get();
     EXPECT_CALL(*mockPtr, Process(testing::_, testing::_, testing::_)).Times(1);
 
-    UniversalServer server("127.0.0.1", TEST_PORT, std::move(mockCore));
+    Server server("127.0.0.1", TEST_PORT, std::move(mockCore));
     std::future<int> server_status = std::async(std::launch::async, [&]() { return server.run(); });
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
@@ -140,8 +136,3 @@ TEST(UniversalServerTest, MethodCallsAndClose)
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 }
 
-int main(int argc, char** argv)
-{
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
