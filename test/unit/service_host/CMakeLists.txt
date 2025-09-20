@@ -3,7 +3,12 @@ add_subdirectory(network_serializer)
 add_subdirectory(server)
 add_subdirectory(utils)
 
-add_custom_target(service_host_tests)
-add_dependencies(service_host_tests ${TEST_TARGET_NAME})
+set(ALL_TEST_TARGETS
+    mms_service_host_exceptions_unit_tests
+    mms_service_host_network_serializer_unit_tests
+    mms_service_host_server_unit_tests
+    mms_service_host_utils_unit_tests
+)
 
-set(SERVICE_HOST_TEST_TARGET ${TEST_TARGET_NAME} PARENT_SCOPE)
+add_custom_target(service_host_tests)
+add_dependencies(service_host_tests ${ALL_TEST_TARGETS})

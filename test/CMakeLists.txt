@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(UniversalServerTests)
+project(MotorManagerServiceTest)
 
 if(APPLE)
     set(GTEST_ROOT "/opt/homebrew/opt/googletest")
