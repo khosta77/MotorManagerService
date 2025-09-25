@@ -21,20 +21,34 @@
 #include "socket.hpp"
 #include "i_core.hpp"
 
+// clang-format off
 /*
  * Структура для установки взаимодействия с модулем сервера
  * */
-BOOST_FUSION_DEFINE_STRUCT((pkg), WhoWantsToTalkToMe, (std::string, name))
+BOOST_FUSION_DEFINE_STRUCT(
+    (pkg), WhoWantsToTalkToMe,
+    (std::string, name)
+)
 
 /*
  * Структура с сообщением сервера, несущее в себе информацию о дальнейшем действие
  * */
-BOOST_FUSION_DEFINE_STRUCT((pkg), Message, (int, id)(std::string, text))
+BOOST_FUSION_DEFINE_STRUCT(
+    (pkg), Message,
+    (int, id)
+    (std::string, text)
+)
 
 /*
  * Сообщение о том, что по соответствующему id все было отработано
  * */
-BOOST_FUSION_DEFINE_STRUCT((pkg), ImOkay, (int, status))
+BOOST_FUSION_DEFINE_STRUCT(
+    (pkg), Status,
+    (std::string, what)
+    (std::string, subMessage)
+    (uint32_t, status)
+)
+// clang-format on
 
 class NetworkSerializer
 {

@@ -1,56 +1,41 @@
 #include "MotorControlServiceCore.hpp"
 
-void print(uint32_t num)
+UserCore::~UserCore() {}
+
+void UserCore::Init()
 {
-    for (int i = 31; i >= 0; --i)
-    {
-        std::cout << ((num >> i) & 1);
-        if (i > 0 && i % 8 == 0)
-        {
-            std::cout << "'";
-        }
-    }
+    std::vector<uint8_t> data = {0b00100000};
+    module_.writeData(data);
+    module_.readData<uint8_t>(data);
+    version_ = data[0] / 100.0;
+    std::cout << std::format("\nSquid version: {}\n", version_);
 }
 
-void print(const std::vector<uint32_t> &values)
+#if 0
+BOOST_FUSION_DEFINE_STRUCT(
+    (mms), MotorSettings,
+    (int, number)
+    (uint32_t, acceleration)
+    (uint32_t, maxSpeed)
+    (int32_t, step)
+)
+
+BOOST_FUSION_DEFINE_STRUCT(
+    (mms), MotorsSettings,
+    (std::string, mode)  // "synchronous" | "asynchronous"
+    (std::vector<mcs::MotorSettings>, motors)
+)
+
+BOOST_FUSION_DEFINE_STRUCT(
+    (pkg), Status,
+    (std::string, what)
+    (std::string, subMessage)
+    (uint32_t, status)
+)
+#endif
+
+std::optional<pkg::Message> UserCore::deserializeMessage(const uinfo &u, const std::string &message)
 {
-    if (values.size() != (MOTOR_COUNT * MOTOR_CELLS_COUNT))
-        throw std::length_error(std::format(
-            "[MotorControlServiceCore](print): values.size() = {}, must be {}",
-            values.size(),
-            (MOTOR_COUNT * MOTOR_CELLS_COUNT)));
-    for (size_t i = 0; i < values.size(); i += 4)
-    {
-        // std::cout << ( i / 4 ) << ')';
-        print(values[i]);
-        std::cout << ' ';
-        print(values[i + 1]);
-        std::cout << ' ';
-        print(values[i + 2]);
-        std::cout << ' ';
-        print(values[i + 3]);
-        std::cout << std::endl;
-        // std::cout << ' ' << values[i + 1] << ' ' << values[i + 2];
-        // std::cout << ' ' << std::bit_cast<int32_t>( values[i + 3] )
-        //           << std::endl;
-    }
-}
-
-MotorControlServiceCore::MotorControlServiceCore() : UniversalServerCore("MotorControlServiceCore") {}
-
-MotorControlServiceCore::MotorControlServiceCore(const std::shared_ptr<ModuleFT232RL> &m_)
-    : UniversalServerCore("MotorControlServiceCore")
-    , module_(m_)
-{}
-
-MotorControlServiceCore::~MotorControlServiceCore() {}
-
-void MotorControlServiceCore::Init() {}
-
-void MotorControlServiceCore::Process(const int id, const std::string &name, const std::string &msg)
-{
-    (void)id;
-    (void)name;
     pkg::Message message_in;
     try
     {
@@ -58,155 +43,165 @@ void MotorControlServiceCore::Process(const int id, const std::string &name, con
     }
     catch (...)
     {
-        std::cout << std::format(">>>> Баг в сообщении: {}", msg) << std::endl;
-        // pkg::ImOkay message_err;
-        // message_err.status = INT_MAX;
-        // writeToSock( id, serialize( message_err ) );
-        return;
+        pkg::Status merr_;
+        merr_.status = 40401; // TODO(khosta77): #001
+        merr_.what = std::format("[{}]: The message is correct({})", u.second, message);
+        merr_.subMessage = "";
+        writeToSock(u.first, serialize(merr_));
+        return {};
     }
+    return message_in;
+}
 
-    mcs::MotorsGroupSettings message;
+std::optional<mms::Manager> UserCore::deserializeManager(const uinfo &u, const std::string &text)
+{
+    mms::Manager manager;
     try
     {
-        message = deserialize<mcs::MotorsGroupSettings>(message_in.text);
+        manager = deserialize<mms::Manager>(text);
     }
     catch (...)
     {
-        std::cout << std::format("===> Баг в сообщении: {}", message_in.text) << std::endl;
-        // pkg::ImOkay message_err;
-        // message_err.status = INT_MAX;
-        // writeToSock( id, serialize( message_err ) );
+        pkg::Status merr_;
+        merr_.status = 40401; // TODO(khosta77): #001
+        merr_.what = std::format("[{}]: The message is correct({})", u.second, message);
+        merr_.subMessage = "";
+        writeToSock(u.first, serialize(merr_));
+        return {};
+    }
+    return manager;
+}
+
+std::optional<mms::MotorsSettings> UserCore::deserializeMotorsSettings(
+    const uinfo &u,
+    const pkg::Message &message)
+{
+    mms::MotorsSettings motorsSetings_;
+    try
+    {
+        motorsSetings_ = deserialize<mms::MotorsSettings>(message.text);
+    }
+    catch (...)
+    {
+        pkg::Status merr_;
+        merr_.status = 40402; // TODO(khosta77): #001
+        merr_.what = std::format("[{}]: The \"MotorsSettings\" is correct({})", u.second, message.text);
+        merr_.subMessage = "";
+        writeToSock(u.first, serialize(merr_));
+        return {};
+    }
+    return motorsSetings_;
+}
+
+bool UserCore::checkMode(const uinfo &u, const mms::MotorsSettings &motorsSetings_)
+{
+    if (motorsSetings_.mode == "synchronous" || motorsSetings_.mode == "asynchronous")
+        return false;
+
+    pkg::Status merr_;
+    merr_.status = 40501; // TODO(khosta77): #001
+    merr_.what = std::format("[{}]: The \"mode\" is correct({})", u.second, motorsSetings_.mode);
+    merr_.subMessage = "";
+    writeToSock(u.first, serialize(merr_));
+    return true;
+}
+
+bool UserCore::checkMotors(const uinfo &u, const mms::MotorsSettings &motorsSettings_)
+{
+    if (motorsSettings_.motors.size() > 10)
+    {
+        pkg::Status merr_;
+        merr_.status = 40502; // TODO: #001
+        merr_.what = std::format(
+            "[{}]: Motors array size exceeds limit ({} > 10)",
+            u.second,
+            motorsSettings_.motors.size());
+        merr_.subMessage = "";
+        writeToSock(u.first, serialize(merr_));
+        return true;
+    }
+
+    for (size_t i = 0; i < motorsSettings_.motors.size(); ++i)
+    {
+        const auto &motor = motorsSettings_.motors[i];
+
+        if (motor.number < 1 || motor.number > 10)
+        {
+            pkg::Status merr_;
+            merr_.status = 40503; // TODO: #001
+            merr_.what = std::format(
+                "[{}]: Motor #{} has invalid number ({}), must be 1-10",
+                u.second,
+                i + 1,
+                motor.number);
+            merr_.subMessage = "";
+            writeToSock(u.first, serialize(merr_));
+            return true;
+        }
+
+        if (motor.acceleration == 0)
+        {
+            pkg::Status merr_;
+            merr_.status = 40504; // TODO: #001
+            merr_.what = std::format("[{}]: Motor #{} has zero acceleration", u.second, motor.number);
+            merr_.subMessage = "";
+            writeToSock(u.first, serialize(merr_));
+            return true;
+        }
+
+        if (motor.maxSpeed == 0)
+        {
+            pkg::Status merr_;
+            merr_.status = 40505; // TODO: #001
+            merr_.what = std::format("[{}]: Motor #{} has zero max speed", u.second, motor.number);
+            merr_.subMessage = "";
+            writeToSock(u.first, serialize(merr_));
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void UserCore::Process(const int fd, const std::string &name, const std::string &message)
+{
+    uinfo u = {fd, name};
+    auto messageIn_ = deserializeMessage(u, message); // pkg::Message
+    if (!messageIn_.has_value())
+        return;
+
+    auto manager_ = deserializeManager(u, messageIn_.text); // mms::Manager
+    if (!manager_.has_value())
+        return;
+
+    auto it = methods.find(name);
+    if (it == methods.end())
+    {
+        // TODO(khosta77): #002
         return;
     }
-
-    std::cout << std::format(
-        "configureAllEngines: {}, startSimultaneously: {}, "
-        "startImmediately: {}",
-        message.configureAllEngines.size(),
-        message.startSimultaneously.size(),
-        message.startImmediately.size())
-              << std::endl;
-
-    std::vector<uint32_t> commandsMessageToBoard(MOTOR_COUNT * MOTOR_CELLS_COUNT, 0);
-
-    setCAE(commandsMessageToBoard, message);
-    setSS(commandsMessageToBoard, message);
-    setSI(commandsMessageToBoard, message);
-    print(commandsMessageToBoard);
-    module_->writeData(commandsMessageToBoard);
-
-    // std::vector<uint32_t> m;
-    // m.resize( 64 );
-    // module_->readData( m );
-    // print( m );
-    //     auto result_ = module_->read<uint32_t>();
-    //     print( result_ );
-}
-
-void MotorControlServiceCore::Launch() {}
-
-void MotorControlServiceCore::Stop() {}
-
-void MotorControlServiceCore::checkMotorNum(const uint32_t num, const std::string &name)
-{
-    if (num > 16 or num < 1)
-        throw std::invalid_argument(std::format(
-            "[MotorControlServiceCore]({}): motor "
-            "num = {}, must be > 0 and < 17",
-            name,
-            num));
-}
-
-void MotorControlServiceCore::setMotor(
-    std::vector<uint32_t> &values,
-    const size_t i,
-    const uint32_t settings,
-    const mcs::MotorSettings &motor_)
-{
-    values[(i + 0)] = settings;
-    values[(i + 1)] = motor_.acceleration;
-    values[(i + 2)] = motor_.maxSpeed;
-    values[(i + 3)] = motor_.step;
-}
-
-void MotorControlServiceCore::setMotors(
-    std::vector<uint32_t> &values,
-    const size_t i,
-    const uint32_t settings,
-    const mcs::MotorsSettings &motors_)
-{
-    values[(i + 0)] = settings;
-    values[(i + 1)] = motors_.acceleration;
-    values[(i + 2)] = motors_.maxSpeed;
-    values[(i + 3)] = motors_.step;
-}
-
-/*
- * @brief setCAE - установка configureAllEngines
- * Возможна коллизия, при которой произайдет перезапись одного
- * движка поверх другого, это нормально
- * TODO(khosta77) : прописать в КД, коллизию выше
- * */
-void MotorControlServiceCore::setCAE(std::vector<uint32_t> &values, const mcs::MotorsGroupSettings &msg)
-{
-    if (!msg.configureAllEngines.empty())
+    if (it != methods.end())
     {
-        for (const auto &group : msg.configureAllEngines)
-        {
-            uint32_t settings = 0b00000000000000001000000000000000;
-            for (const auto &m : group.motors)
-            {
-                checkMotorNum(m, "setConfigureAllEngines");
-                settings |= (1U << (32 - static_cast<uint32_t>(m)));
-            }
-
-            for (const auto &g_ : group.motors)
-                setMotors(values, ((g_ - 1) * MOTOR_CELLS_COUNT), settings, group);
-        }
+        (this->*(it->second))(arg); // Вызов метода через указатель
     }
 }
 
-/*
- * @brief setSS - установка startSimultaneously
- * Возможна коллизия, при которой произайдет перезапись одного
- * движка поверх другого, это нормально
- * TODO(khosta77) : прописать в КД, коллизию выше
- * */
-void MotorControlServiceCore::setSS(std::vector<uint32_t> &values, const mcs::MotorsGroupSettings &msg)
-{
-    if (!msg.startSimultaneously.empty())
-    {
-        auto groups = msg.startSimultaneously;
-        uint32_t settings = 0b00000000000000000100000000000000;
-        for (const auto &group : groups)
-        {
-            checkMotorNum(group.motor, "setStartSimultaneously");
-            settings |= (1U << (32 - static_cast<uint32_t>(group.motor)));
-        }
+void UserCore::Launch() {}
 
-        for (const auto &g_ : groups)
-            setMotor(values, ((g_.motor - 1) * MOTOR_CELLS_COUNT), settings, g_);
-    }
+void UserCore::Stop() {}
+
+void UserCore::version(const uinfo &u, const std::string &message);
+void UserCore::moving(const uinfo &u, const std::string &message)
+{
+    auto motorsSetings_ = deserializeMotorsSettings(u, message);
+    if (!motorsSetings_.has_value())
+        return;
+
+    if (checkMode(u, motorsSetings_.value()) || checkMotors(u, motorsSetings_.value()))
+        return;
 }
 
-/*
- * @brief setSI - установка startImmediately
- * Возможна коллизия, при которой произайдет перезапись одного
- * движка поверх другого, это нормально
- * TODO(khosta77) : прописать в КД, коллизию выше
- * */
-void MotorControlServiceCore::setSI(std::vector<uint32_t> &values, const mcs::MotorsGroupSettings &msg)
-{
-    if (!msg.startImmediately.empty())
-    {
-        for (const auto &g_ : msg.startImmediately)
-        {
-            checkMotorNum(g_.motor, "setStartImmediately");
-            setMotor(
-                values,
-                ((g_.motor - 1) * MOTOR_CELLS_COUNT),
-                ((1U << (32 - static_cast<uint32_t>(g_.motor))) | 0x2000),
-                g_);
-        }
-    }
-}
+void UserCore::reconnect(const uinfo &u, const std::string &message);
+void UserCore::disconnect(const uinfo &u, const std::string &message);
+void UserCore::listconnect(const uinfo &u, const std::string &message);
+
