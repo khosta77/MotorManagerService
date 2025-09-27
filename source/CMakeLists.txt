@@ -14,17 +14,6 @@ target_include_directories(service_host
         ${CMAKE_SOURCE_DIR}/include/service_host
 )
 
-# Библиотека core
-#add_library(user_core STATIC
-#    core/user_core.cpp
-#)
-
-#target_include_directories(user_core PUBLIC
-#    ${CMAKE_SOURCE_DIR}/include/core
-#)
-
-#target_link_libraries(user_core PUBLIC service_host)
-
 # Библиотека module_rs232
 add_library(module_ft232rl
     STATIC
@@ -66,6 +55,29 @@ add_custom_command(
 
 add_executable(ft232rl_main module_rs232/ft232rl_main.cpp)
 target_link_libraries(ft232rl_main module_ft232rl)
+
+# Библиотека core
+add_library(user_core
+    STATIC
+        core/user_core.cpp
+)
+
+target_include_directories(user_core
+    PUBLIC
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/include/core
+        ${CMAKE_SOURCE_DIR}/json/single_include
+        ${CMAKE_SOURCE_DIR}/json/single_include
+        ${CMAKE_SOURCE_DIR}/include/service_host
+        ${CMAKE_SOURCE_DIR}/driver/ftd2xxlib
+        ${CMAKE_SOURCE_DIR}/include/module_rs232
+)
+
+target_link_libraries(user_core
+    PUBLIC
+        service_host
+        module_ft232rl
+)
 
 # Основное приложение
 #add_executable(universal_server core/main.cpp)

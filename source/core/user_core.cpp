@@ -1,13 +1,13 @@
-#include "MotorControlServiceCore.hpp"
+#include "user_core.hpp"
 
 UserCore::~UserCore() {}
 
 void UserCore::Init()
 {
     std::vector<uint8_t> data = {0b00100000};
-    module_.writeData(data);
-    module_.readData<uint8_t>(data);
-    version_ = data[0] / 100.0;
+    module_->writeData(data);
+    module_->readData(data);
+    version_ = data[0] / 100.0f;
     std::cout << std::format("\nSquid version: {}\n", version_);
 }
 
@@ -39,7 +39,7 @@ std::optional<pkg::Message> UserCore::deserializeMessage(const uinfo &u, const s
     pkg::Message message_in;
     try
     {
-        message_in = deserialize<pkg::Message>(msg);
+        message_in = deserialize<pkg::Message>(message);
     }
     catch (...)
     {
@@ -64,7 +64,7 @@ std::optional<mms::Manager> UserCore::deserializeManager(const uinfo &u, const s
     {
         pkg::Status merr_;
         merr_.status = 40401; // TODO(khosta77): #001
-        merr_.what = std::format("[{}]: The message is correct({})", u.second, message);
+        merr_.what = std::format("[{}]: The message is correct({})", u.second, text);
         merr_.subMessage = "";
         writeToSock(u.first, serialize(merr_));
         return {};
@@ -74,18 +74,18 @@ std::optional<mms::Manager> UserCore::deserializeManager(const uinfo &u, const s
 
 std::optional<mms::MotorsSettings> UserCore::deserializeMotorsSettings(
     const uinfo &u,
-    const pkg::Message &message)
+    const std::string &message)
 {
     mms::MotorsSettings motorsSetings_;
     try
     {
-        motorsSetings_ = deserialize<mms::MotorsSettings>(message.text);
+        motorsSetings_ = deserialize<mms::MotorsSettings>(message);
     }
     catch (...)
     {
         pkg::Status merr_;
         merr_.status = 40402; // TODO(khosta77): #001
-        merr_.what = std::format("[{}]: The \"MotorsSettings\" is correct({})", u.second, message.text);
+        merr_.what = std::format("[{}]: The \"MotorsSettings\" is correct({})", u.second, message);
         merr_.subMessage = "";
         writeToSock(u.first, serialize(merr_));
         return {};
@@ -170,19 +170,20 @@ void UserCore::Process(const int fd, const std::string &name, const std::string 
     if (!messageIn_.has_value())
         return;
 
-    auto manager_ = deserializeManager(u, messageIn_.text); // mms::Manager
+    auto manager_ = deserializeManager(u, messageIn_.value().text); // mms::Manager
     if (!manager_.has_value())
         return;
 
-    auto it = methods.find(name);
+    auto it = methods.find(manager_.value().command);
     if (it == methods.end())
     {
         // TODO(khosta77): #002
         return;
     }
+
     if (it != methods.end())
     {
-        (this->*(it->second))(arg); // Вызов метода через указатель
+        (this->*(it->second))(u, manager_.value().message); // Вызов метода через указатель
     }
 }
 
@@ -190,7 +191,12 @@ void UserCore::Launch() {}
 
 void UserCore::Stop() {}
 
-void UserCore::version(const uinfo &u, const std::string &message);
+void UserCore::version(const uinfo &u, const std::string &message)
+{
+    (void)u;
+    (void)message;
+}
+
 void UserCore::moving(const uinfo &u, const std::string &message)
 {
     auto motorsSetings_ = deserializeMotorsSettings(u, message);
@@ -201,7 +207,21 @@ void UserCore::moving(const uinfo &u, const std::string &message)
         return;
 }
 
-void UserCore::reconnect(const uinfo &u, const std::string &message);
-void UserCore::disconnect(const uinfo &u, const std::string &message);
-void UserCore::listconnect(const uinfo &u, const std::string &message);
+void UserCore::reconnect(const uinfo &u, const std::string &message)
+{
+    (void)u;
+    (void)message;
+}
+
+void UserCore::disconnect(const uinfo &u, const std::string &message)
+{
+    (void)u;
+    (void)message;
+}
+
+void UserCore::listconnect(const uinfo &u, const std::string &message)
+{
+    (void)u;
+    (void)message;
+}
 

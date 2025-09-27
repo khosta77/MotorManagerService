@@ -7,10 +7,6 @@
 #include "network_serializer.hpp"
 #include "dataframe.hpp"
 
-#define MOTOR_COUNT       16
-#define MOTOR_CELLS_COUNT 4
-
-
 /*
  * +-+-+-+-+-+-+-+-+---------------------------------------------------------+
  * |0|1|2|3|4|5|6|7|что?                                                     |
@@ -23,18 +19,17 @@
  * +-+-+-+-+-+-+-+-+---------------------------------------------------------+
  * */
 
-template <typename Derived>
 class UserCore : public ICore, public NetworkSerializer
 {
 public:
     UserCore() = delete;
-    UserCore(std::unique_ptr<IModule<Derived>> module, std::unique_ptr<ISocket> socket)
+    UserCore(std::unique_ptr<IModule> module, std::unique_ptr<ISocket> socket)
         : ICore("MotorManagerService")
         , NetworkSerializer(std::move(socket))
         , module_(std::move(module))
         , version_(0.0f)
     {}
-    explicit UserCore(std::unique_ptr<IModule<Derived>> module)
+    explicit UserCore(std::unique_ptr<IModule> module)
         : UserCore(std::move(module), std::make_unique<Socket>())
     {}
     UserCore(const UserCore &) = delete;
@@ -51,12 +46,12 @@ public:
 
 private:
     using uinfo = std::pair<int, std::string>;
-    using MethodPtr = void (A::*)(const uinfo &, const std::string &);
+    using MethodPtr = void (UserCore::*)(const uinfo &, const std::string &);
 
-    std::unique_ptr<IModule<Derived>> module_;
+    std::unique_ptr<IModule> module_;
     float version_;
 
-    map<string, MethodPtr> methods = {
+    std::unordered_map<std::string, MethodPtr> methods = {
         {"version", &UserCore::version},
         {"moving", &UserCore::moving},
         {"reconnect", &UserCore::reconnect},
@@ -71,7 +66,7 @@ private:
 
     std::optional<pkg::Message> deserializeMessage(const uinfo &, const std::string &);
     std::optional<mms::Manager> deserializeManager(const uinfo &, const std::string &);
-    std::optional<mms::MotorsSettings> deserializeMotorsSettings(const uinfo &, const pkg::Message &);
+    std::optional<mms::MotorsSettings> deserializeMotorsSettings(const uinfo &, const std::string &);
     bool checkMode(const uinfo &, const mms::MotorsSettings &);
     bool checkMotors(const uinfo &, const mms::MotorsSettings &);
 };
