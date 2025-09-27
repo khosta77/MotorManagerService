@@ -15,7 +15,6 @@ target_link_libraries(${TEST_NAME}
         GTest::gmock
         GTest::gtest_main
         module_rs232
-        -fprofile-generate
         ${FTD2XX_LIB}
 )
 

@@ -7,8 +7,6 @@ else()
     set(COVERAGE_FLAGS "")
 endif()
 
-set(COVERAGE_FLAGS --coverage -g -O0)
-
 if(APPLE)
     set(GTEST_ROOT "/opt/homebrew/opt/googletest")
     include_directories(${GTEST_ROOT}/include)
