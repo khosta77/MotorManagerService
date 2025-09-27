@@ -87,7 +87,7 @@ public:
 class ModuleFT2xxException : public MyException
 {
 private:
-    std::unordered_map<int, std::string> ftdiErrorCodes_ = {
+    static inline std::unordered_map<unsigned int, std::string> ftdiErrorCodes_ = {
         {1, "FT_INVALID_HANDLE"},
         {2, "FT_DEVICE_NOT_FOUND"},
         {3, "FT_DEVICE_NOT_OPENED"},
@@ -106,12 +106,9 @@ private:
         {16, "FT_INVALID_ARGS"},
         {17, "FT_NOT_SUPPORTED"},
         {18, "FT_OTHER_ERROR"}};
-    std::string m_msg;
-
-    void currentTime(std::ostream &os);
 
 public:
-    ModuleFT2xxException(const unsigned int &code);
+    ModuleFT2xxException(const unsigned int code);
 };
 
 #endif // EXCEPTION_HPP_

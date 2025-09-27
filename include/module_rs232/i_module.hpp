@@ -18,7 +18,7 @@ class IModule
 public:
     virtual ~IModule() = default;
 
-    virtual bool connect() = 0;
+    virtual bool connect(const int) = 0;
     virtual void disconnect() = 0;
     virtual bool isConnected() const = 0;
     virtual std::vector<std::string> listComs() const = 0;

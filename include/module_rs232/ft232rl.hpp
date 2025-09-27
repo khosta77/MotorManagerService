@@ -12,10 +12,10 @@ extern "C"
 class FT232RL : public IModule
 {
 public:
-    FT232RL(const int dev_id = 0, const int baudrate = 9600);
+    FT232RL(const int baudrate = 9600);
     ~FT232RL() override;
 
-    bool connect() override;
+    bool connect(const int) override;
     void disconnect() override;
     bool isConnected() const override;
     std::vector<std::string> listComs() const override;
@@ -68,7 +68,7 @@ public:
     friend std::ostream &operator<<(std::ostream &, const FT232RL &);
 
 private:
-    unsigned int device_id_;
+    unsigned int m_deviceId;
     int baudrate_;
     bool connected_;
 
@@ -92,7 +92,7 @@ private:
 
     std::mutex mutex_;
 
-    void getDeviceInfo();
+    void getDeviceInfo(const int);
     static std::vector<FT_DEVICE_LIST_INFO_NODE> getDeviceList();
 };
 

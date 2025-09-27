@@ -1,63 +1,55 @@
 #include "ft232rl.hpp"
 
-FT232RL::FT232RL(const int dev_id, const int baudrate) : device_id_(dev_id), baudrate_(baudrate)
-{
-    getDeviceInfo();
-}
-
+FT232RL::FT232RL(const int baudrate) : m_deviceId(-1), baudrate_(baudrate) {}
 FT232RL::~FT232RL()
 {
     disconnect();
 }
 
-bool FT232RL::connect()
+bool FT232RL::connect(const int deviceId)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (connected_)
+        return (m_deviceId == deviceId);
+
+    if (FT_STATUS code = FT_Open(deviceId, &ftHandle); code != FT_OK)
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-
-        if (connected_)
-        {
-            return true; // Уже подключен
-        }
-
-        if (FT_STATUS code = FT_Open(device_id_, &ftHandle); code != FT_OK)
-        {
-            std::cerr << "Failed to connect to device " << device_id_ << ", error: " << code << std::endl;
-            connected_ = false;
-            return false;
-        }
+        std::cerr << "Failed to connect to device " << deviceId << ", error: " << code << std::endl;
+        connected_ = false;
+        return false;
     }
 
     try
     {
-        this->setBaudRate(baudrate_);
-        this->setUSBParameters(256, 256);
-        FT_SetTimeouts(ftHandle, 1000, 1000);
-        FT_SetEventNotification(ftHandle, FT_EVENT_RXCHAR, 0);
-
+        if (FT_STATUS code = FT_SetBaudRate(ftHandle, baudrate_); code != FT_OK)
+            throw ModuleFT2xxException(code);
+        if (FT_STATUS code = FT_SetUSBParameters(ftHandle, 256, 256); code != FT_OK)
+            throw ModuleFT2xxException(code);
+        if (FT_STATUS code = FT_SetTimeouts(ftHandle, 1000, 1000); code != FT_OK)
+            throw ModuleFT2xxException(code);
+        getDeviceInfo(deviceId);
         connected_ = true;
-        std::cout << "Successfully connected to device " << device_id_ << std::endl;
-        return true;
+        m_deviceId = deviceId;
     }
     catch (const ModuleFT2xxException &e)
     {
-        std::cerr << "Error during device setup: " << e.what() << std::endl;
         FT_Close(ftHandle);
         connected_ = false;
-        return false;
+        throw std::runtime_error(e.what());
     }
+    return connected_;
 }
 
 void FT232RL::disconnect()
 {
     std::lock_guard<std::mutex> lock(mutex_);
-
-    if (connected_ && ftHandle)
+    if (connected_ and ftHandle)
     {
         FT_Close(ftHandle);
         ftHandle = nullptr;
         connected_ = false;
-        std::cout << "Disconnected from device " << device_id_ << std::endl;
+        m_deviceId = -1;
     }
 }
 
@@ -158,43 +150,39 @@ size_t FT232RL::checkRXChannel() const
     return static_cast<size_t>(RxBytes);
 }
 
-void FT232RL::getDeviceInfo()
+void FT232RL::getDeviceInfo(const int deviceId)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (!connected_)
-        throw ModuleFT2xxException(FT_DEVICE_NOT_OPENED);
-
     DWORD numDevs;
 
     if (FT_STATUS code = FT_CreateDeviceInfoList(&numDevs); code != FT_OK)
         throw ModuleFT2xxException(code);
 
-    if (((device_id_ < 0) and (device_id_ >= numDevs)))
+    if (((deviceId < 0) and (deviceId >= numDevs)))
         throw ModuleFT2xxException(FT_DEVICE_NOT_FOUND);
 
     FT_STATUS code = FT_GetDeviceInfoDetail(
-        device_id_,
-        &device_info_[device_id_].flags_,
-        &device_info_[device_id_].type_,
-        &device_info_[device_id_].id_,
-        &device_info_[device_id_].locId_,
-        device_info_[device_id_].serialNumber_,
-        device_info_[device_id_].description_,
-        &device_info_[device_id_].ftHandleTemp_);
+        deviceId,
+        &device_info_[deviceId].flags_,
+        &device_info_[deviceId].type_,
+        &device_info_[deviceId].id_,
+        &device_info_[deviceId].locId_,
+        device_info_[deviceId].serialNumber_,
+        device_info_[deviceId].description_,
+        &device_info_[deviceId].ftHandleTemp_);
 
     if (code != FT_OK)
         throw ModuleFT2xxException(code);
 }
 
-std::ostream &operator<<(std::ostream &os, const FT232RL &ft_)
+std::ostream &operator<<(std::ostream &os, const FT232RL &m_)
 {
-    os << std::dec << "Dev " << ft_.device_id_ << ":" << std::endl;
-    os << std::hex << "\tFlags = 0x" << ft_.device_info_[ft_.device_id_].flags_ << std::endl;
-    os << std::hex << "\tType = 0x" << ft_.device_info_[ft_.device_id_].type_ << std::endl;
-    os << std::hex << "\tID = 0x" << ft_.device_info_[ft_.device_id_].id_ << std::endl;
-    os << std::hex << "\tLocId = 0x" << ft_.device_info_[ft_.device_id_].locId_ << std::endl;
-    os << std::dec << "\tSerialNumber = " << ft_.device_info_[ft_.device_id_].serialNumber_ << std::endl;
-    os << std::dec << "\tDescription = " << ft_.device_info_[ft_.device_id_].description_ << std::endl;
+    os << std::dec << "Dev " << m_.m_deviceId << ":" << std::endl;
+    os << std::hex << "\tFlags = 0x" << m_.device_info_[m_.m_deviceId].flags_ << std::endl;
+    os << std::hex << "\tType = 0x" << m_.device_info_[m_.m_deviceId].type_ << std::endl;
+    os << std::hex << "\tID = 0x" << m_.device_info_[m_.m_deviceId].id_ << std::endl;
+    os << std::hex << "\tLocId = 0x" << m_.device_info_[m_.m_deviceId].locId_ << std::endl;
+    os << std::dec << "\tSerialNumber = " << m_.device_info_[m_.m_deviceId].serialNumber_ << std::endl;
+    os << std::dec << "\tDescription = " << m_.device_info_[m_.m_deviceId].description_ << std::endl;
     return os;
 }
 
