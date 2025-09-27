@@ -15,6 +15,15 @@ public:
     FT232RL(const int dev_id = 0, const int baudrate = 9600);
     ~FT232RL() override;
 
+    bool connect() override;
+    void disconnect() override;
+    bool isConnected() const override;
+    std::vector<std::string> listComs() const override;
+    explicit operator bool() const override
+    {
+        return isConnected();
+    }
+
     /* @brief BaudRate
      * */
     void setBaudRate(const int) override;
@@ -61,6 +70,7 @@ public:
 private:
     unsigned int device_id_;
     int baudrate_;
+    bool connected_;
 
     // http://microsin.net/programming/pc/ftdi-d2xx-functions-api.html - ds
     FT_HANDLE ftHandle;
@@ -83,6 +93,7 @@ private:
     std::mutex mutex_;
 
     void getDeviceInfo();
+    static std::vector<FT_DEVICE_LIST_INFO_NODE> getDeviceList();
 };
 
 std::ostream &operator<<(std::ostream &os, const FT232RL &ft_);
