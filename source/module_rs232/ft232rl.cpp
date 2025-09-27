@@ -106,3 +106,63 @@ std::ostream &operator<<(std::ostream &os, const FT232RL &ft_)
     return os;
 }
 
+void FT232RL::writeData(const std::vector<uchar> &frame)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    const size_t b_size = frame.size();
+    std::cout << std::format("b_size:= {}\n", b_size);
+
+    size_t count = frame.size(); // 128;
+    for (size_t i = 0; i < b_size; i += frame.size())
+    {
+        if (count > (b_size - i))
+            count = b_size - i;
+
+        FT_STATUS code = FT_Write(
+            ftHandle,
+            static_cast<LPVOID>(const_cast<uint8_t *>(frame.data() + i)),
+            count,
+            &BytesWritten);
+        if (code != FT_OK)
+            throw ModuleFT2xxException(code);
+        std::cout << BytesWritten << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    }
+}
+
+void FT232RL::readData(std::vector<uchar> &frame)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    const size_t SIZE = frame.size();
+
+    if (FT_STATUS code = FT_Read(ftHandle, frame.data(), SIZE, &BytesReceived); code != FT_OK)
+        throw ModuleFT2xxException(code);
+}
+
+std::vector<uchar> FT232RL::read(const size_t timeout)
+{
+    while (checkRXChannel() == 0)
+    {
+        // Это очень ужасно, но выбора нет, надо вставить мин задержку
+        // иначе, другие не раздуплятся. В целом эта задержка ресурсы не
+        // стирает, а для модуля она слишком быстрая и он разницы не
+        // заметит. Возможно надо будет увиличить
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
+    }
+
+    size_t newCurrentValue = checkRXChannel();
+    for (size_t i = 0; i < timeout; ++i)
+    {
+        size_t buffer = checkRXChannel();
+        if (buffer != newCurrentValue)
+        {
+            newCurrentValue = buffer;
+            i = 0;
+        }
+    }
+
+    std::vector<uchar> message_(newCurrentValue, 0);
+    readData(message_);
+    return message_;
+}
+

@@ -16,6 +16,6 @@ int main()
     std::cout << module_;
     std::cout << std::string(80, '=') << std::endl;
     module_.setBaudRate(115200);
-    module_.writeDataImpl(std::vector<uchar>(1000, 0));
+    module_.writeData(std::vector<uchar>(1000, 0));
     return 0;
 }

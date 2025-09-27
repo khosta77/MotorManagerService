@@ -13,39 +13,19 @@
 
 using uchar = unsigned char;
 
-class IModuleBase
+class IModule
 {
 public:
-    virtual ~IModuleBase() = default;
+    virtual ~IModule() = default;
 
     virtual void setBaudRate(const int) = 0;
     virtual void setUSBParameters(const int, const int) = 0;
     virtual void setCharacteristics(const uchar, const uchar, const uchar) = 0;
     virtual void waitWriteSuccess() = 0;
     virtual size_t checkRXChannel() const = 0;
-};
-
-template <typename Derived>
-class IModule : public IModuleBase
-{
-public:
-    template <typename T>
-    void writeData(const std::vector<T>& data)
-    {
-        static_cast<Derived*>(this)->writeDataImpl(data);
-    }
-
-    template <typename T>
-    void readData(std::vector<T>& data)
-    {
-        static_cast<Derived*>(this)->readDataImpl(data);
-    }
-
-    template <typename T>
-    std::vector<T> read(const size_t timeout)
-    {
-        return static_cast<Derived*>(this)->template readImpl<T>(timeout);
-    }
+    virtual void writeData(const std::vector<uchar>& data) = 0;
+    virtual void readData(std::vector<uchar>& data) = 0;
+    virtual std::vector<uchar> read(const size_t timeout) = 0;
 };
 
 #endif // MODULE_HPP_

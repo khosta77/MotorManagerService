@@ -9,7 +9,7 @@ extern "C"
 #include "ftd2xx.h"
 };
 
-class FT232RL : public IModule<FT232RL>
+class FT232RL : public IModule
 {
 public:
     FT232RL(const int dev_id = 0, const int baudrate = 9600);
@@ -39,82 +39,22 @@ public:
     void waitWriteSuccess() override;
     size_t checkRXChannel() const override;
 
-    /* @brief функция отправляет данные на устройство. В примере использования
-     * FT_Read были еще статусы какие-то и задержки, в общем они не работали
-     * @param frame_ - массив, который отправляем
+    /* @brief функция отправляет данные на устройство
+     * @param frame - массив байтов, который отправляем
      * */
-    template <typename T>
-    void writeDataImpl(const std::vector<T> &frame)
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        const size_t b_size = sizeof(T) * frame.size();
-        std::cout << std::format("b_size:= {}\n", b_size);
-
-        // Создаем буфер нужного размера
-        std::vector<uint8_t> buffer(b_size);
-
-        // Копируем данные в буфер
-        std::memcpy(buffer.data(), frame.data(), b_size);
-
-        size_t count = frame.size(); // 128;
-        for (size_t i = 0; i < b_size; i += frame.size())
-        {
-            if (count > (b_size - i))
-                count = b_size - i;
-
-            FT_STATUS code = FT_Write(ftHandle, buffer.data() + i, count, &BytesWritten);
-            if (code != FT_OK)
-                throw ModuleFT2xxException(code);
-            std::cout << BytesWritten << std::endl;
-            std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-            // FT_Purge( ftHandle, FT_PURGE_TX | FT_PURGE_RX );
-        }
-    }
+    void writeData(const std::vector<uchar> &frame) override;
 
     /* @brief функция читает данные с устройства. В примере использования
      * FT_Read были еще статусы какие-то и задержки, в общем они не работали
      * @param frame_ - массив, который считываем. НАДО ЗАРАНЕЕ ЗНАТЬ ЕГО РАЗМЕР
      * */
-    template <typename T>
-    void readDataImpl(std::vector<T> &frame_)
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        const size_t SIZE = (sizeof(T) * frame_.size());
-        std::vector<uint8_t> buffer_(SIZE);
+    void readData(std::vector<uchar> &frame) override;
 
-        if (FT_STATUS code = FT_Read(ftHandle, buffer_.data(), SIZE, &BytesReceived); code != FT_OK)
-            throw ModuleFT2xxException(code);
-
-        std::memcpy(frame_.data(), buffer_.data(), SIZE);
-    }
-
-    template <typename T>
-    std::vector<T> readImpl(const size_t timeout = 1000)
-    {
-        while (checkRXChannel() == 0)
-        {
-            // Это очень ужасно, но выбора нет, надо вставить мин задержку
-            // иначе, другие не раздуплятся. В целом эта задержка ресурсы не
-            // стирает, а для модуля она слишком быстрая и он разницы не
-            // заметит. Возможно надо будет увиличить
-            std::this_thread::sleep_for(std::chrono::microseconds(10));
-        }
-
-        size_t newCurrentValue = checkRXChannel();
-        for (size_t i = 0; i < timeout; ++i)
-        {
-            size_t buffer = checkRXChannel();
-            if (buffer != newCurrentValue)
-            {
-                newCurrentValue = buffer;
-                i = 0;
-            }
-        }
-
-        std::vector<T> message_((newCurrentValue / sizeof(T)), 0);
-        readData<T>(message_);
-        return message_;
-    }
+    /* @brief функция читает данные с устройства с таймаутом
+     * @param timeout - время ожидания в миллисекундах
+     * @return вектор байтов с полученными данными
+     * */
+    std::vector<uchar> read(const size_t timeout = 1000) override;
 
     friend std::ostream &operator<<(std::ostream &, const FT232RL &);
 
