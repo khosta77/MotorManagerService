@@ -32,6 +32,24 @@ BOOST_FUSION_DEFINE_STRUCT(
     (std::string, subMessage)
     (uint32_t, status)
 )
+
+BOOST_FUSION_DEFINE_STRUCT(
+    (pkg), WhoWantsToTalkToMe,
+    (std::string, name)
+)
+
+BOOST_FUSION_DEFINE_STRUCT(
+    (pkg), Message,
+    (int, id)
+    (std::string, text)
+)
+
+BOOST_FUSION_DEFINE_STRUCT(
+    (pkg), Status,
+    (std::string, what)
+    (std::string, subMessage)
+    (uint32_t, status)
+)
 #endif
 
 std::optional<pkg::Message> UserCore::deserializeMessage(const uinfo &u, const std::string &message)
