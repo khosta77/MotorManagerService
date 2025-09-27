@@ -1,4 +1,4 @@
-set(TEST_NAME mms_core_user_core_unit_tests)
+set(TEST_NAME mms_module_rs232_ft232rl_unit_tests)
 file(GLOB EXCEPTIONS_TEST_SOURCES "*.cpp")
 
 add_executable(${TEST_NAME} ${EXCEPTIONS_TEST_SOURCES})
@@ -14,7 +14,7 @@ target_link_libraries(${TEST_NAME}
     PRIVATE
         GTest::gmock
         GTest::gtest_main
-        user_core
+        module_rs232
         -fprofile-generate
         ${FTD2XX_LIB}
 )
@@ -30,8 +30,8 @@ add_custom_command(
     COMMAND
         ${CMAKE_COMMAND} -E copy
         ${CMAKE_SOURCE_DIR}/driver/libftd2xx.dylib
-        ${CMAKE_BINARY_DIR}/test/unit/core/user_core/libftd2xx.dylib
-    COMMENT "copy libftd2xx.dylib to build/test/unit/core/user_core/"
+        ${CMAKE_BINARY_DIR}/test/unit/module_rs232/ft232rl/libftd2xx.dylib
+    COMMENT "copy libftd2xx.dylib to build/test/unit/module_rs232/ft232rl/"
 )
 
 target_compile_options(${TEST_NAME} PUBLIC ${COVERAGE_FLAGS})

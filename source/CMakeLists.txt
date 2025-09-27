@@ -15,37 +15,33 @@ target_include_directories(service_host
 )
 
 # Библиотека module_rs232
-add_library(module_ft232rl
+add_library(module_rs232
     STATIC
         module_rs232/ft232rl.cpp
 )
 
-target_include_directories(module_ft232rl
-    PUBLIC
-        ${FTD2XX_LIB}
-)
-
-target_link_libraries(module_ft232rl
+target_link_libraries(module_rs232
     PRIVATE
         service_host
         ${FTD2XX_LIB}
 )
 
-target_include_directories(module_ft232rl
+target_include_directories(module_rs232
     PUBLIC
+        ${FTD2XX_LIB}
         ${CMAKE_SOURCE_DIR}/json/single_include
         ${CMAKE_SOURCE_DIR}/include/service_host
         ${CMAKE_SOURCE_DIR}/driver/ftd2xxlib
         ${CMAKE_SOURCE_DIR}/include/module_rs232
 )
 
-set_target_properties(module_ft232rl PROPERTIES
+set_target_properties(module_rs232 PROPERTIES
     INSTALL_RPATH "@loader_path"
     BUILD_WITH_INSTALL_RPATH TRUE
 )
 
 add_custom_command(
-    TARGET module_ft232rl POST_BUILD
+    TARGET module_rs232 POST_BUILD
     COMMAND
         ${CMAKE_COMMAND} -E copy
         ${CMAKE_SOURCE_DIR}/driver/libftd2xx.dylib
@@ -54,7 +50,7 @@ add_custom_command(
 )
 
 add_executable(ft232rl_main module_rs232/ft232rl_main.cpp)
-target_link_libraries(ft232rl_main module_ft232rl)
+target_link_libraries(ft232rl_main module_rs232)
 
 # Библиотека core
 add_library(user_core
@@ -76,7 +72,7 @@ target_include_directories(user_core
 target_link_libraries(user_core
     PUBLIC
         service_host
-        module_ft232rl
+        module_rs232
 )
 
 # Основное приложение
