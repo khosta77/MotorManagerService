@@ -1,9 +1,10 @@
-#include <gtest/gtest.h>
 #include "ft232rl.hpp"
+
+#include <gtest/gtest.h>
 #include <thread>
 #include <chrono>
 
-
+#if 1
 // Тест подключения и отключения
 TEST(FT232RLTest, ConnectionManagement)
 {
@@ -36,152 +37,282 @@ TEST(FT232RLTest, ConnectionManagement)
     module_.disconnect();
     EXPECT_FALSE(module_.isConnected());
     EXPECT_FALSE(static_cast<bool>(module_));
-}
 
-#if 0
+    EXPECT_TRUE(module_.connect(0));
+    EXPECT_TRUE(module_.isConnected());
+    EXPECT_TRUE(static_cast<bool>(module_));
+    FT232RL modul1_;
+    EXPECT_TRUE(modul1_.connect(1));
+    EXPECT_TRUE(modul1_.isConnected());
+    EXPECT_TRUE(static_cast<bool>(modul1_));
+}
+#endif
+
 // Тест получения списка устройств
-TEST_F(FT232RLTest, DeviceListing)
+TEST(FT232RLTest, DeviceListing)
 {
-    auto devices = module1.listComs();
-    EXPECT_GE(devices.size(), 2); // Должно быть как минимум 2 устройства
+    FT232RL module_;
+    auto devices = module_.listComs();
+    EXPECT_GE(devices.size(), 2);
+}
 
-    // Выводим информацию об устройствах для отладки
-    std::cout << "Found " << devices.size() << " devices:" << std::endl;
-    for (const auto& device : devices)
+// Тест настроек BaudRate
+TEST(FT232RLTest, BaudRateSettings)
+{
+    FT232RL module1;
+    FT232RL module2;
+
+    ASSERT_TRUE(module1.connect(0)) << "Failed to connect module1";
+    ASSERT_TRUE(module2.connect(1)) << "Failed to connect module2";
+
+    // Тестируем разные скорости
+    std::vector<int> baudRates = {9600, 19200, 38400, 57600, 115200};
+
+    for (int baudRate : baudRates)
     {
-        std::cout << "  " << device << std::endl;
+        EXPECT_NO_THROW(module1.setBaudRate(baudRate));
+        EXPECT_NO_THROW(module2.setBaudRate(baudRate));
+
+        EXPECT_EQ(module1.getBaudRate(), baudRate);
+        EXPECT_EQ(module2.getBaudRate(), baudRate);
     }
-}
 
-// Тест одновременной работы с двумя устройствами
-TEST_F(FT232RLTest, MultipleDevices)
-{
-    // Подключаем оба устройства
-    ASSERT_TRUE(module1.connect());
-    ASSERT_TRUE(module2.connect());
-
-    // Проверяем, что оба подключены
-    EXPECT_TRUE(module1.isConnected());
-    EXPECT_TRUE(module2.isConnected());
-
-    // Устанавливаем разные параметры для каждого устройства
-    module1.setBaudRate(9600);
-    module2.setBaudRate(115200);
-
-    module1.setCharacteristics(FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE);
-    module2.setCharacteristics(FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_EVEN);
-}
-
-// Тест обработки ошибок
-TEST_F(FT232RLTest, ErrorHandling)
-{
-    // Попытка работы с неподключенным устройством должна бросать исключение
-    EXPECT_THROW(module1.setBaudRate(9600), ModuleFT2xxException);
-    EXPECT_THROW(module1.writeData({0x01, 0x02}), ModuleFT2xxException);
-
-    // Подключаем и проверяем нормальную работу
-    ASSERT_TRUE(module1.connect());
-    EXPECT_NO_THROW(module1.setBaudRate(9600));
-}
-
-// Тест передачи данных между устройствами
-TEST_F(FT232RLTest, DataTransfer)
-{
-    // Этот тест требует, чтобы устройства были соединены между собой
-    // (TX одного подключен к RX другого и наоборот)
-
-    ASSERT_TRUE(module1.connect());
-    ASSERT_TRUE(module2.connect());
-
-    // Устанавливаем одинаковые параметры
+    // Восстанавливаем стандартную скорость
     module1.setBaudRate(9600);
     module2.setBaudRate(9600);
-    module1.setCharacteristics(FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE);
-    module2.setCharacteristics(FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE);
 
-    // Тестовые данные
-    std::vector<uchar> testData = {0x48, 0x65, 0x6C, 0x6C, 0x6F}; // "Hello"
-
-    // Отправляем данные с первого устройства
-    EXPECT_NO_THROW(module1.writeData(testData));
-
-    // Ждем немного для передачи
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-    // Проверяем, что данные получены на втором устройстве
-    size_t availableBytes = module2.checkRXChannel();
-    if (availableBytes > 0)
-    {
-        std::vector<uchar> receivedData = module2.read(500);
-        EXPECT_EQ(receivedData.size(), testData.size());
-        if (receivedData.size() == testData.size())
-        {
-            EXPECT_EQ(receivedData, testData);
-        }
-    }
+    module1.disconnect();
+    module2.disconnect();
 }
 
-// Тест таймаутов
-TEST_F(FT232RLTest, TimeoutHandling)
+// Тест параметров USB
+TEST(FT232RLTest, USBParameters)
 {
-    ASSERT_TRUE(module1.connect());
+    FT232RL module1;
+    FT232RL module2;
 
-    // Чтение при отсутствии данных должно вернуть пустой вектор
-    auto result = module1.read(100); // Таймаут 100 мс
-    EXPECT_TRUE(result.empty());
+    module1.connect(0);
+    module2.connect(1);
+
+    // Тестируем разные размеры буферов
+    EXPECT_NO_THROW(module1.setUSBParameters(512, 512));
+    EXPECT_NO_THROW(module2.setUSBParameters(1024, 1024));
+
+    // Дополнительные тесты с разными размерами
+    EXPECT_NO_THROW(module1.setUSBParameters(256, 512));
+    EXPECT_NO_THROW(module2.setUSBParameters(512, 256));
+
+    module1.disconnect();
+    module2.disconnect();
 }
 
-// Тест потокобезопасности
-TEST_F(FT232RLTest, ThreadSafety)
+// Тест характеристик передачи
+TEST(FT232RLTest, DataCharacteristics)
 {
-    ASSERT_TRUE(module1.connect());
+    FT232RL module1;
+    FT232RL module2;
 
-    auto worker = [](FT232RL& module, int threadId) {
+    module1.connect(0);
+    module2.connect(1);
+
+    // Тестируем разные конфигурации
+    EXPECT_NO_THROW(module1.setCharacteristics(FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE));
+    EXPECT_NO_THROW(module2.setCharacteristics(FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE));
+
+    EXPECT_NO_THROW(module1.setCharacteristics(FT_BITS_7, FT_STOP_BITS_1, FT_PARITY_EVEN));
+    EXPECT_NO_THROW(module2.setCharacteristics(FT_BITS_7, FT_STOP_BITS_2, FT_PARITY_ODD));
+
+    // Возвращаем к стандартной конфигурации
+    EXPECT_NO_THROW(module1.setCharacteristics(FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE));
+    EXPECT_NO_THROW(module2.setCharacteristics(FT_BITS_8, FT_STOP_BITS_1, FT_PARITY_NONE));
+
+    module1.disconnect();
+    module2.disconnect();
+}
+
+// Тест проверки RX канала
+TEST(FT232RLTest, RXChannelCheck)
+{
+    FT232RL module1;
+    FT232RL module2;
+
+    module1.connect(0);
+    module2.connect(1);
+
+    // Проверяем, что функция не бросает исключений
+    EXPECT_NO_THROW(module1.checkRXChannel());
+    EXPECT_NO_THROW(module2.checkRXChannel());
+
+    // Получаем размеры буферов
+    size_t rx1 = module1.checkRXChannel();
+    size_t rx2 = module2.checkRXChannel();
+
+    // Это просто проверка что функция работает, не проверяем конкретные значения
+    // так как они зависят от состояния устройств
+    // std::cout << "Device 0 RX bytes: " << rx1 << std::endl;
+    // std::cout << "Device 1 RX bytes: " << rx2 << std::endl;
+
+    module1.disconnect();
+    module2.disconnect();
+}
+
+// Тест записи данных
+TEST(FT232RLTest, DataWrite)
+{
+    FT232RL module1;
+    FT232RL module2;
+
+    module1.connect(0);
+    module2.connect(1);
+
+    // Тестовые данные для отправки
+    std::vector<uchar> testData1 = {0x01, 0x02, 0x03, 0x04, 0x05};
+    std::vector<uchar> testData2 = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE};
+
+    // Тестируем запись
+    EXPECT_NO_THROW(module1.writeData(testData1));
+    EXPECT_NO_THROW(module2.writeData(testData2));
+
+    // Тестируем с пустыми данными
+    std::vector<uchar> emptyData;
+    EXPECT_NO_THROW(module1.writeData(emptyData));
+    EXPECT_NO_THROW(module2.writeData(emptyData));
+
+    // Тестируем с большими данными
+    std::vector<uchar> largeData(100, 0x55);
+    EXPECT_NO_THROW(module1.writeData(largeData));
+
+    module1.disconnect();
+    module2.disconnect();
+}
+
+// Тест оператора вывода
+TEST(FT232RLTest, OutputOperator)
+{
+    FT232RL module1;
+    FT232RL module2;
+
+    module1.connect(0);
+    module2.connect(1);
+    std::stringstream ss;
+
+    // Проверяем что оператор вывода работает без исключений
+    EXPECT_NO_THROW(ss << module1 << std::endl);
+    EXPECT_NO_THROW(ss << module2 << std::endl);
+
+    module1.disconnect();
+    module2.disconnect();
+}
+
+// Тест работы с исключениями при неправильных операциях
+TEST(FT232RLTest, ExceptionHandling)
+{
+    FT232RL module;
+
+    // Попытка установить BaudRate без подключения
+    EXPECT_THROW(module.setBaudRate(9600), ModuleFT2xxException);
+
+    // Попытка установить USB параметры без подключения
+    EXPECT_THROW(module.setUSBParameters(256, 256), ModuleFT2xxException);
+
+    // Попытка установить характеристики без подключения
+    EXPECT_THROW(module.setCharacteristics(), ModuleFT2xxException);
+
+    // Попытка записи без подключения
+    std::vector<uchar> testData = {0x01, 0x02};
+    EXPECT_THROW(module.writeData(testData), ModuleFT2xxException);
+
+    // Попытка чтения без подключения
+    EXPECT_THROW(module.readData(testData), ModuleFT2xxException);
+
+    // Попытка проверки RX канала без подключения
+    EXPECT_THROW(module.checkRXChannel(), ModuleFT2xxException);
+}
+
+// Тест многопоточного доступа
+TEST(FT232RLTest, ThreadSafety)
+{
+    FT232RL module1;
+    FT232RL module2;
+
+    module1.connect(0);
+    module2.connect(1);
+
+    // Запускаем несколько потоков для каждого устройства
+    auto testDevice = [](FT232RL& module, int deviceId) {
         for (int i = 0; i < 10; ++i)
         {
-            EXPECT_NO_THROW(module.setBaudRate(9600 + threadId * 100 + i));
+            EXPECT_NO_THROW(module.setBaudRate(9600 + i * 1000));
+            EXPECT_NO_THROW(module.checkRXChannel());
+
+            std::vector<uchar> testData = {static_cast<uchar>(i), static_cast<uchar>(deviceId)};
+            EXPECT_NO_THROW(module.writeData(testData));
+
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     };
 
-    std::thread t1(worker, std::ref(module1), 1);
-    std::thread t2(worker, std::ref(module1), 2);
+    std::thread thread1(testDevice, std::ref(module1), 0);
+    std::thread thread2(testDevice, std::ref(module2), 1);
 
-    t1.join();
-    t2.join();
+    thread1.join();
+    thread2.join();
+
+    module1.disconnect();
+    module2.disconnect();
 }
 
-// Тест оператора приведения к bool
-TEST_F(FT232RLTest, BoolConversion)
+// Тест последовательного подключения/отключения
+TEST(FT232RLTest, SequentialConnection)
 {
-    FT232RL module(0);
+    FT232RL module;
 
-    // До подключения
-    if (module)
+    // Многократное подключение/отключение
+    for (int i = 0; i < 5; ++i)
     {
-        FAIL() << "Module should not be connected";
-    }
+        EXPECT_TRUE(module.connect(0));
+        EXPECT_TRUE(module.isConnected());
 
-    // После подключения
-    module.connect();
-    if (!module)
-    {
-        FAIL() << "Module should be connected";
-    }
+        // Выполняем некоторые операции
+        EXPECT_NO_THROW(module.setBaudRate(9600));
+        EXPECT_NO_THROW(module.checkRXChannel());
 
-    // После отключения
-    module.disconnect();
-    if (module)
-    {
-        FAIL() << "Module should not be connected after disconnect";
+        module.disconnect();
+        EXPECT_FALSE(module.isConnected());
     }
 }
-#endif
+
+// Тест информации об устройствах
+TEST(FT232RLTest, DeviceInfo)
+{
+    FT232RL module1;
+    FT232RL module2;
+
+    // Получаем список устройств до подключения
+    auto devicesBefore = module1.listComs();
+    EXPECT_GE(devicesBefore.size(), 2);
+
+    module1.connect(0);
+    module2.connect(1);
+
+    std::stringstream ss;
+    // Проверяем что информация об устройствах доступна
+    EXPECT_NO_THROW(ss << module1 << std::endl);
+    EXPECT_NO_THROW(ss << module2 << std::endl);
+
+    // Получаем список устройств после подключения
+    auto devicesAfter = module1.listComs();
+    EXPECT_EQ(devicesBefore.size(), devicesAfter.size());
+
+    module1.disconnect();
+    module2.disconnect();
+}
+
 int main(int argc, char** argv)
 {
     testing::InitGoogleTest(&argc, argv);
     {
-        FT232RL tempModule(0);
+        FT232RL tempModule;
         auto devices = tempModule.listComs();
         assert(devices.size() >= 2);
     }

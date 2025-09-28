@@ -9,7 +9,7 @@ set(FTD2XX_LIB "${CMAKE_CURRENT_SOURCE_DIR}/driver/libftd2xx.dylib")
 set(FTD2XX_BLB "${CMAKE_CURRENT_SOURCE_DIR}/build/libftd2xx.dylib")
 
 set(BUILD_TESTS ON)
-set(ENABLE_COVERAGE OFF)
+set(ENABLE_COVERAGE ON)
 
 if(ENABLE_COVERAGE)
     add_compile_options(--coverage)

@@ -24,6 +24,7 @@ public:
     virtual std::vector<std::string> listComs() const = 0;
 
     virtual void setBaudRate(const int) = 0;
+    virtual int getBaudRate() = 0;
     virtual void setUSBParameters(const int, const int) = 0;
     virtual void setCharacteristics(const uchar, const uchar, const uchar) = 0;
     virtual void waitWriteSuccess() = 0;

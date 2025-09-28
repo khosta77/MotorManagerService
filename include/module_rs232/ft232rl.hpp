@@ -12,7 +12,7 @@ extern "C"
 class FT232RL : public IModule
 {
 public:
-    FT232RL(const int baudrate = 9600);
+    FT232RL();
     ~FT232RL() override;
 
     bool connect(const int) override;
@@ -27,6 +27,7 @@ public:
     /* @brief BaudRate
      * */
     void setBaudRate(const int) override;
+    int getBaudRate() override;
 
     /* @brief Установить параметры USB, Увеличение буферов (перед открытием
      * устройства)
@@ -43,7 +44,10 @@ public:
      * @param parity - четность - должно быть FT_PARITY_NONE, FT_PARITY_ODD,
      * FT_PARITY_EVEN, \ FT_PARITY_MARK или FT_PARITY SPACE
      * */
-    void setCharacteristics(const uchar, const uchar, const uchar) override;
+    void setCharacteristics(
+        const uchar wordlenght = FT_BITS_8,
+        const uchar stopbit = FT_STOP_BITS_1,
+        const uchar parity = FT_PARITY_NONE) override;
 
     void waitWriteSuccess() override;
     size_t checkRXChannel() const override;
@@ -69,8 +73,8 @@ public:
 
 private:
     unsigned int m_deviceId;
-    int baudrate_;
-    bool connected_;
+    int m_baudrate;
+    bool m_connected;
 
     // http://microsin.net/programming/pc/ftdi-d2xx-functions-api.html - ds
     FT_HANDLE ftHandle;
