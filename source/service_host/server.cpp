@@ -45,6 +45,7 @@ bool Server::ifMessageEmptyCloseSocket(const int i)
     {
         if ((*client).second == clients_name_[fds_[i].fd])
         {
+            std::cout << std::format("\t[USER-ERASE]({})\n", clients_name_[fds_[i].fd]);
             clients_name_.erase(client);
             break;
         }
@@ -57,24 +58,24 @@ bool Server::ifMessageEmptyCloseSocket(const int i)
 bool Server::get_WhoAmI_Info(const int i, std::string& message)
 {
     if (clients_name_.count(fds_[i].fd))
-        return false;
+        return true;
 
+    std::cout << "->" << message << std::endl;
     try
     {
         auto aboutNewUser = deserialize<pkg::WhoWantsToTalkToMe>(message);
         clients_name_[fds_[i].fd] = std::move(aboutNewUser.name);
+        std::cout << std::format("\t[USER-ADD]({})\n", clients_name_[fds_[i].fd]);
     }
-    catch (const DeserializeJsonNoKey& emsg_key)
-    { /* nothing */
-    }
-    catch (const DeserializeJsonElementSomeProblem& emsg_value)
-    { /* nothing */
+    catch (const std::exception& e)
+    {
+        std::cout << e.what() << std::endl;
     }
     catch (...)
     { /* nothing */
     }
 
-    return true;
+    return false;
 }
 
 void Server::processTheRequest([[maybe_unused]] const int i, [[maybe_unused]] std::string& message)
@@ -108,8 +109,9 @@ void Server::checkingSocketsOnNewContent()
 
             for (std::string message : messages)
             {
-                if (!get_WhoAmI_Info(i, message))
+                if (get_WhoAmI_Info(i, message))
                 {
+                    std::cout << "=>" << message << std::endl;
                     processTheRequest(i, message);
                 }
 
