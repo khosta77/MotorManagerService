@@ -5,10 +5,10 @@ UserCore::~UserCore() {}
 void UserCore::Init()
 {
     std::vector<uint8_t> data = {0b00100000};
-    module_->writeData(data);
-    module_->readData(data);
-    version_ = data[0] / 100.0f;
-    std::cout << std::format("\nSquid version: {}\n", version_);
+    m_module->writeData(data);
+    m_module->readData(data);
+    m_version = data[0] / 100.0f;
+    std::cout << std::format("\nSquid version: {}\n", m_version);
 }
 
 std::optional<pkg::Message> UserCore::deserializeMessage(const uinfo &u, const std::string &message)
@@ -156,7 +156,7 @@ bool UserCore::checkEmptyMessage(const uinfo &u, const std::string &message)
 
 bool UserCore::checkConnection(const uinfo &u)
 {
-    if (!module_->isConnected())
+    if (!m_module->isConnected())
     {
         pkg::Status merr_;
         merr_.status = 40507; // TODO: #001
@@ -179,14 +179,14 @@ void UserCore::Process(const int fd, const std::string &name, const std::string 
     if (!manager_.has_value())
         return;
 
-    auto it = methods.find(manager_.value().command);
-    if (it == methods.end())
+    auto it = m_methods.find(manager_.value().command);
+    if (it == m_methods.end())
     {
         // TODO(khosta77): #002
         return;
     }
 
-    if (it != methods.end())
+    if (it != m_methods.end())
     {
         (this->*(it->second))(u, manager_.value().message); // Вызов метода через указатель
     }
@@ -205,8 +205,8 @@ void UserCore::version(const uinfo &u, const std::string &message)
         return;
 
     std::vector<uint8_t> data = {0b00100000}; // Команда запроса версии прошивки
-    module_->writeData(data);
-    module_->readData(data);
+    m_module->writeData(data);
+    m_module->readData(data);
     
     uint8_t versionByte = data[0];
     uint8_t integerPart = (versionByte >> 4) & 0x0F;  // Первые 4 бита

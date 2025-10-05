@@ -31,8 +31,8 @@ public:
     UserCore(std::unique_ptr<IModule> module, std::unique_ptr<ISocket> socket)
         : ICore("MotorManagerService")
         , NetworkSerializer(std::move(socket))
-        , module_(std::move(module))
-        , version_(0.0f)
+        , m_module(std::move(module))
+        , m_version(0.0f)
     {}
     explicit UserCore(std::unique_ptr<IModule> module)
         : UserCore(std::move(module), std::make_unique<Socket>())
@@ -53,10 +53,10 @@ private:
     using uinfo = std::pair<int, std::string>;
     using MethodPtr = void (UserCore::*)(const uinfo &, const std::string &);
 
-    std::unique_ptr<IModule> module_;
-    float version_;
+    std::unique_ptr<IModule> m_module;
+    float m_version;
 
-    std::unordered_map<std::string, MethodPtr> methods = {
+    std::unordered_map<std::string, MethodPtr> m_methods = {
         {"version", &UserCore::version},
         {"moving", &UserCore::moving},
         {"reconnect", &UserCore::reconnect},
