@@ -1,0 +1,80 @@
+#include "network_serializer.hpp"
+
+NetworkSerializer::NetworkSerializer() : MAX_BUFFER_COUNT(1024), socketInterface_(std::make_unique<Socket>())
+{}
+
+NetworkSerializer::NetworkSerializer(std::unique_ptr<ISocket> socketmock)
+    : MAX_BUFFER_COUNT(1024)
+    , socketInterface_(std::move(socketmock))
+{}
+
+std::string NetworkSerializer::readFromSock(const int socket_)
+{
+    std::string rxData;
+    std::vector<char> buffer(MAX_BUFFER_COUNT, 0);
+
+    while (true)
+    {
+        int bytesReceived = socketInterface_->read(socket_, buffer.data(), MAX_BUFFER_COUNT);
+        if (bytesReceived == 0)
+        {
+            // Просто выходит, посылка получена, значит
+            break;
+        }
+
+        if (bytesReceived < 0)
+            throw ErrorReadingFromSocket(socket_);
+
+        rxData.append(buffer.data(), bytesReceived);
+
+        if (((rxData.back() == '\n') and (*(rxData.rbegin() + 1) == '\n')))
+        {
+            // Посылка закончилась, выход
+            break;
+        }
+    }
+
+    buffer.clear();
+    return rxData;
+}
+
+void NetworkSerializer::writeToSock(const int socket_, std::string msg)
+{
+    if (msg.find("\n\n") != std::string::npos)
+        throw NotCorrectMessageToSend();
+
+    msg += "\n\n";
+    const char* dataPtr = msg.c_str();
+    size_t dataSize = msg.length();
+    size_t totalSend = 0;
+
+    while (totalSend < dataSize)
+    {
+        int bytesSend = socketInterface_->write(socket_, (dataPtr + totalSend), (dataSize - totalSend));
+        if (bytesSend == -1)
+            throw ErrorWritingToSocket(socket_);
+
+        totalSend += bytesSend;
+    }
+}
+
+std::vector<std::string> NetworkSerializer::split(const std::string& message)
+{
+    std::vector<std::string> result;
+    size_t start = 0;
+    size_t end = message.find("\n\n");
+
+    while (end != std::string::npos)
+    {
+        result.push_back(message.substr(start, end - start));
+        if (result.back().empty())
+            result.pop_back();
+        start = end + 2;
+        end = message.find("\n\n", start);
+    }
+
+    if (start < message.length())
+        result.push_back(message.substr(start));
+
+    return result;
+}
