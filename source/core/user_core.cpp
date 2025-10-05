@@ -286,7 +286,7 @@ void UserCore::moving(const uinfo &u, const std::string &message)
 
 void UserCore::reconnect(const uinfo &u, const std::string &message)
 {
-    if (!m_module->isConnected())
+    if (m_module->isConnected())
     {
         pkg::Status merr_;
         merr_.status = 40512; // TODO: #001
@@ -309,15 +309,26 @@ void UserCore::reconnect(const uinfo &u, const std::string &message)
 
     pkg::Status ok_;
     ok_.status = 0;
-    ok_.what = "mms::Device";
+    ok_.what = "";
     ok_.subMessage = "";
     writeToSock(u.first, serialize(ok_));
 }
 
 void UserCore::disconnect(const uinfo &u, const std::string &message)
 {
-    (void)u;
-    (void)message;
+    if (checkEmptyMessage(u, message))
+        return;
+
+    if (checkConnection(u))
+        return;
+
+    m_module->disconnect();
+
+    pkg::Status ok_;
+    ok_.status = 0;
+    ok_.what = "";
+    ok_.subMessage = "";
+    writeToSock(u.first, serialize(ok_));
 }
 
 void UserCore::listconnect(const uinfo &u, const std::string &message)
