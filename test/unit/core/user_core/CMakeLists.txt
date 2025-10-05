@@ -15,7 +15,6 @@ target_link_libraries(${TEST_NAME}
         GTest::gmock
         GTest::gtest_main
         user_core
-        -fprofile-generate
         ${FTD2XX_LIB}
 )
 

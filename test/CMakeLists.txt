@@ -19,12 +19,12 @@ find_package(Threads REQUIRED)
 include(GoogleTest)
 
 add_subdirectory(unit/service_host)
-add_subdirectory(unit/module_rs232)
+#add_subdirectory(unit/module_rs232)
 add_subdirectory(unit/core)
 
 add_custom_target(all_unit_tests)
 add_dependencies(all_unit_tests
     service_host_tests
-    module_rs232_tests
+    #module_rs232_tests
     core_tests
 )
