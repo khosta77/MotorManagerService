@@ -50,6 +50,11 @@ BOOST_FUSION_DEFINE_STRUCT(
 )
 
 BOOST_FUSION_DEFINE_STRUCT(
+    (mms), Device,
+    (int, deviceId)
+)
+
+BOOST_FUSION_DEFINE_STRUCT(
     (mms), ListConnect,
     (std::vector<std::string>, listConnect)
 )

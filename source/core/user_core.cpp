@@ -70,6 +70,25 @@ std::optional<mms::MotorsSettings> UserCore::deserializeMotorsSettings(
     return motorsSetings_;
 }
 
+std::optional<mms::Device> UserCore::deserializeDevice(const uinfo &u, const std::string &message)
+{
+    mms::Device device_;
+    try
+    {
+        device_ = deserialize<mms::Device>(message);
+    }
+    catch (...)
+    {
+        pkg::Status merr_;
+        merr_.status = 40403; // TODO(khosta77): #001
+        merr_.what = std::format("[{}]: The \"Device\" is correct({})", u.second, message);
+        merr_.subMessage = "";
+        writeToSock(u.first, serialize(merr_));
+        return {};
+    }
+    return device_;
+}
+
 bool UserCore::checkMode(const uinfo &u, const mms::MotorsSettings &motorsSetings_)
 {
     if (motorsSetings_.mode == "synchronous" || motorsSetings_.mode == "asynchronous")
@@ -168,6 +187,34 @@ bool UserCore::checkConnection(const uinfo &u)
     return false;
 }
 
+bool UserCore::checkDeviceId(const uinfo &u, int deviceId)
+{
+    if (deviceId < 0)
+    {
+        pkg::Status merr_;
+        merr_.status = 40509; // TODO: #001
+        merr_.what = std::format("[{}]: Device id must be >= 0, got {}", u.second, deviceId);
+        merr_.subMessage = "";
+        writeToSock(u.first, serialize(merr_));
+        return true;
+    }
+    return false;
+}
+
+bool UserCore::checkConnectResult(const uinfo &u, int deviceId, bool ok)
+{
+    if (!ok)
+    {
+        pkg::Status merr_;
+        merr_.status = 40510; // TODO: #001
+        merr_.what = std::format("[{}]: Failed to connect device {}", u.second, deviceId);
+        merr_.subMessage = "";
+        writeToSock(u.first, serialize(merr_));
+        return true;
+    }
+    return false;
+}
+
 void UserCore::Process(const int fd, const std::string &name, const std::string &message)
 {
     uinfo u = {fd, name};
@@ -239,8 +286,32 @@ void UserCore::moving(const uinfo &u, const std::string &message)
 
 void UserCore::reconnect(const uinfo &u, const std::string &message)
 {
-    (void)u;
-    (void)message;
+    if (!m_module->isConnected())
+    {
+        pkg::Status merr_;
+        merr_.status = 40512; // TODO: #001
+        merr_.what = std::format("[{}]: Module is connecting", u.second);
+        merr_.subMessage = "";
+        writeToSock(u.first, serialize(merr_));
+        return;
+    }
+
+    auto device_ = deserializeDevice(u, message);
+    if (!device_.has_value())
+        return;
+
+    if (checkDeviceId(u, device_.value().deviceId))
+        return;
+
+    bool ok = m_module->connect(device_.value().deviceId);
+    if (checkConnectResult(u, device_.value().deviceId, ok))
+        return;
+
+    pkg::Status ok_;
+    ok_.status = 0;
+    ok_.what = "mms::Device";
+    ok_.subMessage = "";
+    writeToSock(u.first, serialize(ok_));
 }
 
 void UserCore::disconnect(const uinfo &u, const std::string &message)

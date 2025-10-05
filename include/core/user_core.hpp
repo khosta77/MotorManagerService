@@ -83,6 +83,7 @@ private:
     std::optional<pkg::Message> deserializeMessage(const uinfo &, const std::string &);
     std::optional<mms::Manager> deserializeManager(const uinfo &, const std::string &);
     std::optional<mms::MotorsSettings> deserializeMotorsSettings(const uinfo &, const std::string &);
+    std::optional<mms::Device> deserializeDevice(const uinfo &, const std::string &);
     bool checkMode(const uinfo &, const mms::MotorsSettings &);
     bool checkMotors(const uinfo &, const mms::MotorsSettings &);
     /**
@@ -100,6 +101,21 @@ private:
      * @return true если соединения нет (ошибка), false если соединение есть (OK)
      */
     bool checkConnection(const uinfo &);
+    /**
+     * @brief Проверяет корректность идентификатора устройства
+     * @param u Информация о пользователе
+     * @param deviceId Идентификатор устройства
+     * @return true если deviceId некорректен (ошибка), false если корректен (OK)
+     */
+    bool checkDeviceId(const uinfo &, int deviceId);
+    /**
+     * @brief Проверяет результат подключения к устройству
+     * @param u Информация о пользователе
+     * @param deviceId Идентификатор устройства
+     * @param ok Результат попытки подключения
+     * @return true если подключение не удалось (ошибка), false если успех (OK)
+     */
+    bool checkConnectResult(const uinfo &, int deviceId, bool ok);
 };
 
 #endif // TRANSFORMATIONCORE_HPP_
