@@ -44,15 +44,26 @@ BOOST_FUSION_DEFINE_STRUCT(
 )
 
 BOOST_FUSION_DEFINE_STRUCT(
-    (mms), Manager,
-    (std::string, command)  // "MotorsSettings" | "asynchronous"
-    (std::string, message) //
+    (mms), Version,
+    (float, version)
+    (std::string, name)
 )
-// command: 1 - version()
-//          2 - moving(MotorsSettings)
-//          3 - reconnect(id)
-//          4 - disconnect()
-//          5 - listconnect()
+
+BOOST_FUSION_DEFINE_STRUCT(
+    (mms), ListConnect,
+    (std::vector<std::string>, listConnect)
+)
+
+BOOST_FUSION_DEFINE_STRUCT(
+    (mms), Manager,
+    (std::string, command)  // command
+    (std::string, message)  // сообщение для команды
+)
+// command: version()
+//          moving(MotorsSettings)
+//          reconnect(id)
+//          disconnect()
+//          listconnect()
 // clang-format on
 
 #endif // DATAFRAME_HPP_

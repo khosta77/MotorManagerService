@@ -9,7 +9,7 @@
 
 /*
  * +-+-+-+-+-+-+-+-+---------------------------------------------------------+
- * |0|1|2|3|4|5|6|7|что?                                                     |
+ * |0|1|2|3|4|5|6|7|Биты для отправки в микроконтрллер                       |
  * +-+-+-+-+-+-+-+-+---------------------------------------------------------+
  * |1|0|0|0|X|X|X|X|Запуска одновременно всех ШД, на которые пришла установка|
  * +-+-+-+-+-+-+-+-+---------------------------------------------------------+
@@ -17,6 +17,11 @@
  * +-+-+-+-+-+-+-+-+---------------------------------------------------------+
  * |0|0|1|0|X|X|X|X|Запросить информацию о версии прошивки                   |
  * +-+-+-+-+-+-+-+-+---------------------------------------------------------+
+ * command: [] version()
+ *          [] moving(MotorsSettings)
+ *          [] reconnect(id)
+ *          [] disconnect()
+ *          [] listconnect()
  * */
 
 class UserCore : public ICore, public NetworkSerializer
@@ -58,6 +63,17 @@ private:
         {"disconnect", &UserCore::disconnect},
         {"listconnect", &UserCore::listconnect}};
 
+    /**
+     * @brief Получает информацию о версии прошивки микроконтроллера
+     * 
+     * Метод отправляет команду запроса версии прошивки в микроконтроллер,
+     * получает ответ в виде одного байта, где первые 4 бита - целая часть версии,
+     * а вторые 4 бита - дробная часть. Формирует структуру mms::Version с именем "Squid"
+     * и отправляет её клиенту через сокет.
+     * 
+     * @param u Информация о пользователе (дескриптор сокета и имя)
+     * @param message Должна быть пустой строкой, иначе возвращается ошибка
+     */
     void version(const uinfo &u, const std::string &message);
     void moving(const uinfo &u, const std::string &message);
     void reconnect(const uinfo &u, const std::string &message);
@@ -69,6 +85,21 @@ private:
     std::optional<mms::MotorsSettings> deserializeMotorsSettings(const uinfo &, const std::string &);
     bool checkMode(const uinfo &, const mms::MotorsSettings &);
     bool checkMotors(const uinfo &, const mms::MotorsSettings &);
+    /**
+     * @brief Проверяет, что сообщение пустое
+     * 
+     * @param u Информация о пользователе (дескриптор сокета и имя)
+     * @param message Сообщение для проверки
+     * @return true если сообщение не пустое (ошибка), false если пустое (OK)
+     */
+    bool checkEmptyMessage(const uinfo &, const std::string &);
+    /**
+     * @brief Проверяет соединение с модулем
+     * 
+     * @param u Информация о пользователе (дескриптор сокета и имя)
+     * @return true если соединения нет (ошибка), false если соединение есть (OK)
+     */
+    bool checkConnection(const uinfo &);
 };
 
 #endif // TRANSFORMATIONCORE_HPP_

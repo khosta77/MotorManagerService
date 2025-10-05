@@ -11,47 +11,6 @@ void UserCore::Init()
     std::cout << std::format("\nSquid version: {}\n", version_);
 }
 
-#if 0
-BOOST_FUSION_DEFINE_STRUCT(
-    (mms), MotorSettings,
-    (int, number)
-    (uint32_t, acceleration)
-    (uint32_t, maxSpeed)
-    (int32_t, step)
-)
-
-BOOST_FUSION_DEFINE_STRUCT(
-    (mms), MotorsSettings,
-    (std::string, mode)  // "synchronous" | "asynchronous"
-    (std::vector<mcs::MotorSettings>, motors)
-)
-
-BOOST_FUSION_DEFINE_STRUCT(
-    (pkg), Status,
-    (std::string, what)
-    (std::string, subMessage)
-    (uint32_t, status)
-)
-
-BOOST_FUSION_DEFINE_STRUCT(
-    (pkg), WhoWantsToTalkToMe,
-    (std::string, name)
-)
-
-BOOST_FUSION_DEFINE_STRUCT(
-    (pkg), Message,
-    (int, id)
-    (std::string, text)
-)
-
-BOOST_FUSION_DEFINE_STRUCT(
-    (pkg), Status,
-    (std::string, what)
-    (std::string, subMessage)
-    (uint32_t, status)
-)
-#endif
-
 std::optional<pkg::Message> UserCore::deserializeMessage(const uinfo &u, const std::string &message)
 {
     pkg::Message message_in;
@@ -181,6 +140,34 @@ bool UserCore::checkMotors(const uinfo &u, const mms::MotorsSettings &motorsSett
     return false;
 }
 
+bool UserCore::checkEmptyMessage(const uinfo &u, const std::string &message)
+{
+    if (!message.empty())
+    {
+        pkg::Status merr_;
+        merr_.status = 40506; // TODO: #001
+        merr_.what = std::format("[{}]: The message should be empty for version command, got: {}", u.second, message);
+        merr_.subMessage = "";
+        writeToSock(u.first, serialize(merr_));
+        return true;
+    }
+    return false;
+}
+
+bool UserCore::checkConnection(const uinfo &u)
+{
+    if (!module_->isConnected())
+    {
+        pkg::Status merr_;
+        merr_.status = 40507; // TODO: #001
+        merr_.what = std::format("[{}]: Module is not connected", u.second);
+        merr_.subMessage = "";
+        writeToSock(u.first, serialize(merr_));
+        return true;
+    }
+    return false;
+}
+
 void UserCore::Process(const int fd, const std::string &name, const std::string &message)
 {
     uinfo u = {fd, name};
@@ -211,12 +198,37 @@ void UserCore::Stop() {}
 
 void UserCore::version(const uinfo &u, const std::string &message)
 {
-    (void)u;
-    (void)message;
+    if (checkEmptyMessage(u, message))
+        return;
+
+    if (checkConnection(u))
+        return;
+
+    std::vector<uint8_t> data = {0b00100000}; // Команда запроса версии прошивки
+    module_->writeData(data);
+    module_->readData(data);
+    
+    uint8_t versionByte = data[0];
+    uint8_t integerPart = (versionByte >> 4) & 0x0F;  // Первые 4 бита
+    uint8_t decimalPart = versionByte & 0x0F;         // Вторые 4 бита
+    
+    mms::Version versionInfo;
+    versionInfo.version = static_cast<float>(integerPart) + static_cast<float>(decimalPart) / 10.0f;
+    versionInfo.name = "Squid";
+
+    pkg::Status response;
+    response.status = 0;
+    response.subMessage = serialize(versionInfo);
+    response.what = "mms::Version";
+    
+    writeToSock(u.first, serialize(response));
 }
 
 void UserCore::moving(const uinfo &u, const std::string &message)
 {
+    if (checkConnection(u))
+        return;
+
     auto motorsSetings_ = deserializeMotorsSettings(u, message);
     if (!motorsSetings_.has_value())
         return;
