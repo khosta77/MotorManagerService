@@ -165,7 +165,8 @@ bool UserCore::checkEmptyMessage(const uinfo &u, const std::string &message)
     {
         pkg::Status merr_;
         merr_.status = 40506; // TODO: #001
-        merr_.what = std::format("[{}]: The message should be empty for version command, got: {}", u.second, message);
+        merr_.what =
+            std::format("[{}]: The message should be empty for version command, got: {}", u.second, message);
         merr_.subMessage = "";
         writeToSock(u.first, serialize(merr_));
         return true;
@@ -251,11 +252,11 @@ void UserCore::version(const uinfo &u, const std::string &message)
     std::vector<uint8_t> data = {0b00100000}; // Команда запроса версии прошивки
     m_module->writeData(data);
     m_module->readData(data);
-    
+
     uint8_t versionByte = data[0];
-    uint8_t integerPart = (versionByte >> 4) & 0x0F;  // Первые 4 бита
-    uint8_t decimalPart = versionByte & 0x0F;         // Вторые 4 бита
-    
+    uint8_t integerPart = (versionByte >> 4) & 0x0F; // Первые 4 бита
+    uint8_t decimalPart = versionByte & 0x0F;        // Вторые 4 бита
+
     mms::Version versionInfo;
     versionInfo.version = static_cast<float>(integerPart) + static_cast<float>(decimalPart) / 10.0f;
     versionInfo.name = "Squid";
@@ -264,7 +265,7 @@ void UserCore::version(const uinfo &u, const std::string &message)
     response.status = 0;
     response.subMessage = serialize(versionInfo);
     response.what = "mms::Version";
-    
+
     writeToSock(u.first, serialize(response));
 }
 

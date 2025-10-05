@@ -4,7 +4,7 @@
 /*
 Примеры JSON для каждой структуры:
 
-1) mms::MotorSettings
+1) mms::Motor
 {
     "number": 1,
     "acceleration": 2000,
@@ -59,7 +59,7 @@
 #include <boost/type_index.hpp>
 
 BOOST_FUSION_DEFINE_STRUCT(
-    (mms), MotorSettings,
+    (mms), Motor,
     (int, number)
     (uint32_t, acceleration)
     (uint32_t, maxSpeed)
@@ -69,7 +69,7 @@ BOOST_FUSION_DEFINE_STRUCT(
 BOOST_FUSION_DEFINE_STRUCT(
     (mms), MotorsSettings,
     (std::string, mode)  // "synchronous" | "asynchronous"
-    (std::vector<mms::MotorSettings>, motors)
+    (std::vector<mms::Motor>, motors)
 )
 
 BOOST_FUSION_DEFINE_STRUCT(
