@@ -2,16 +2,45 @@
 #define DATAFRAME_HPP_
 
 /*
+Примеры JSON для каждой структуры:
+
+1) mms::MotorSettings
 {
-    "mode": "synchronous" | "asynchronous",
-    "motors" : [
-        {
-            "номер" : 1-10,
-            "ускорен" : ...,
-            "максскор" : ...,
-            "шаги" : +-...,
-        }
+    "number": 1,
+    "acceleration": 2000,
+    "maxSpeed": 5000,
+    "step": 100
+}
+
+2) mms::MotorsSettings
+{
+    "mode": "synchronous",
+    "motors": [
+        {"number": 1, "acceleration": 2000, "maxSpeed": 5000, "step": 100},
+        {"number": 2, "acceleration": 1500, "maxSpeed": 4500, "step": -50}
     ]
+}
+
+3) mms::Version
+{
+    "version": 1.2,
+    "name": "Squid"
+}
+
+4) mms::Device
+{
+    "deviceId": 0
+}
+
+5) mms::ListConnect
+{
+    "listConnect": ["COM0", "COM1"]
+}
+
+6) mms::Manager
+{
+    "command": "version",
+    "message": ""
 }
 */
 
