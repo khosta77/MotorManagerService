@@ -1,4 +1,6 @@
 #include "user_core.hpp"
+#include <thread>
+#include <chrono>
 
 UserCore::~UserCore() {}
 
@@ -274,12 +276,124 @@ void UserCore::moving(const uinfo &u, const std::string &message)
     if (checkConnection(u))
         return;
 
-    auto motorsSetings_ = deserializeMotorsSettings(u, message);
-    if (!motorsSetings_.has_value())
+    auto motorsSettings_ = deserializeMotorsSettings(u, message);
+    if (!motorsSettings_.has_value())
         return;
 
-    if (checkMode(u, motorsSetings_.value()) || checkMotors(u, motorsSetings_.value()))
+    if (checkMode(u, motorsSettings_.value()) || checkMotors(u, motorsSettings_.value()))
         return;
+
+    // Реализация протокола взаимодействия с MCU согласно документации
+    
+    const auto& settings = motorsSettings_.value();
+    const size_t motorCount = settings.motors.size();
+    
+    // 1. Отправка команды режима и количества моторов
+    uint8_t commandByte;
+    if (settings.mode == "synchronous") {
+        commandByte = 0x80 | static_cast<uint8_t>(motorCount); // 0x8N
+    } else { // asynchronous
+        commandByte = 0x40 | static_cast<uint8_t>(motorCount); // 0x4N
+    }
+    
+    std::vector<uint8_t> commandData = {commandByte};
+    m_module->writeData(commandData);
+    
+    // 2. Получение подтверждения готовности MCU
+    std::vector<uint8_t> readinessResponse(1);
+    m_module->readData(readinessResponse);
+    
+    uint8_t readinessCode = readinessResponse[0];
+    if (readinessCode != 0x00) {
+        // Ошибка готовности MCU
+        pkg::Status errorResponse;
+        errorResponse.status = 40512; // MCU readiness error
+        errorResponse.what = std::format("[{}]: MCU readiness error: 0x{:02X}", u.second, readinessCode);
+        errorResponse.subMessage = "";
+        writeToSock(u.first, serialize(errorResponse));
+        return;
+    }
+    
+    // 3. Отправка параметров моторов
+    std::vector<uint8_t> motorData;
+    motorData.reserve(motorCount * 16); // 4 параметра × 4 байта на мотор
+    
+    for (const auto& motor : settings.motors) {
+        // number (4 байта)
+        uint32_t number = static_cast<uint32_t>(motor.number);
+        motorData.insert(motorData.end(), 
+            reinterpret_cast<uint8_t*>(&number), 
+            reinterpret_cast<uint8_t*>(&number) + 4);
+        
+        // acceleration (4 байта)
+        uint32_t acceleration = motor.acceleration;
+        motorData.insert(motorData.end(), 
+            reinterpret_cast<uint8_t*>(&acceleration), 
+            reinterpret_cast<uint8_t*>(&acceleration) + 4);
+        
+        // maxSpeed (4 байта)
+        uint32_t maxSpeed = motor.maxSpeed;
+        motorData.insert(motorData.end(), 
+            reinterpret_cast<uint8_t*>(&maxSpeed), 
+            reinterpret_cast<uint8_t*>(&maxSpeed) + 4);
+        
+        // step (4 байта)
+        uint32_t step = static_cast<uint32_t>(motor.step);
+        motorData.insert(motorData.end(), 
+            reinterpret_cast<uint8_t*>(&step), 
+            reinterpret_cast<uint8_t*>(&step) + 4);
+    }
+    
+    m_module->writeData(motorData);
+    
+    // 4. Ожидание ответа о завершении работы с таймаутом
+    std::vector<uint8_t> completionResponse(1);
+    
+    // Простая реализация таймаута через проверку доступных данных
+    // В реальной реализации здесь должен быть более сложный механизм таймаута
+    size_t timeoutMs = 5000; // 5 секунд
+    size_t elapsedMs = 0;
+    const size_t checkIntervalMs = 100;
+    
+    while (elapsedMs < timeoutMs) {
+        size_t availableBytes = m_module->checkRXChannel();
+        if (availableBytes >= 1) {
+            m_module->readData(completionResponse);
+            break;
+        }
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(checkIntervalMs));
+        elapsedMs += checkIntervalMs;
+    }
+    
+    if (elapsedMs >= timeoutMs) {
+        // Таймаут ожидания ответа от MCU
+        pkg::Status errorResponse;
+        errorResponse.status = 40511; // Timeout waiting for MCU response
+        errorResponse.what = std::format("[{}]: Timeout waiting for MCU response", u.second);
+        errorResponse.subMessage = "";
+        writeToSock(u.first, serialize(errorResponse));
+        return;
+    }
+    
+    // 5. Проверка результата выполнения
+    uint8_t completionCode = completionResponse[0];
+    if (completionCode != 0xFF) {
+        // Ошибка выполнения на MCU
+        pkg::Status errorResponse;
+        errorResponse.status = 40513; // MCU execution error
+        errorResponse.what = std::format("[{}]: MCU execution error: 0x{:02X}", u.second, completionCode);
+        errorResponse.subMessage = "";
+        writeToSock(u.first, serialize(errorResponse));
+        return;
+    }
+    
+    // 6. Успешное выполнение
+    pkg::Status successResponse;
+    successResponse.status = 0;
+    successResponse.what = "";
+    successResponse.subMessage = "";
+    writeToSock(u.first, serialize(successResponse));
 }
 
 void UserCore::reconnect(const uinfo &u, const std::string &message)
