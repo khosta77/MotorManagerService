@@ -44,9 +44,25 @@ public:
     UserCore &operator=(const UserCore &) = delete;
     UserCore &operator=(UserCore &&) = delete;
 
+    /**
+     * @brief Инициализация ядра сервиса
+     * Выполняет начальный запрос версии устройства для верификации связи.
+     */
     void Init() override;
+    /**
+     * @brief Обработка входящего сообщения от клиента
+     * @param fd Дескриптор сокета клиента
+     * @param name Имя клиента
+     * @param message Сериализованное сообщение `pkg::Message`
+     */
     void Process(const int fd, const std::string &name, const std::string &message) override;
+    /**
+     * @brief Запуск сервиса (при наличии фоновой логики)
+     */
     void Launch() override;
+    /**
+     * @brief Остановка сервиса (освобождение ресурсов)
+     */
     void Stop() override;
 
 private:
@@ -64,20 +80,89 @@ private:
         {"listconnect", &UserCore::listconnect}};
 
     /**
-     * @brief Получает информацию о версии прошивки микроконтроллера
+     * @brief Команда version()
      * 
-     * Метод отправляет команду запроса версии прошивки в микроконтроллер,
-     * получает ответ в виде одного байта, где первые 4 бита - целая часть версии,
-     * а вторые 4 бита - дробная часть. Формирует структуру mms::Version с именем "Squid"
-     * и отправляет её клиенту через сокет.
+     * Отправляет запрос версии прошивки в микроконтроллер и возвращает
+     * структуру `mms::Version` (через `pkg::Status`). Версия кодируется одним байтом:
+     * старшие 4 бита — целая часть, младшие 4 бита — дробная часть (x.y).
+     * 
+     * Правила и проверки:
+     * - Сообщение `message` обязано быть пустым, иначе ошибка `40506`.
+     * - Требуется активное соединение с модулем, иначе ошибка `40507`.
+     * 
+     * Ответ:
+     * - `status = 0`, `what = "mms::Version"`, `subMessage = serialize(mms::Version)`
      * 
      * @param u Информация о пользователе (дескриптор сокета и имя)
-     * @param message Должна быть пустой строкой, иначе возвращается ошибка
+     * @param message Должна быть пустой строкой
      */
     void version(const uinfo &u, const std::string &message);
+    /**
+     * @brief Команда moving(MotorsSettings)
+     * 
+     * Принимает сериализованные настройки двигателей `mms::MotorsSettings`,
+     * валидирует режим работы ("synchronous"|"asynchronous") и параметры каждого двигателя
+     * (кол-во не более 10, номер 1..10, acceleration>0, maxSpeed>0). В дальнейшем
+     * выполняет соответствующую команду на модуле (реализация управления — отдельно).
+     * 
+     * Правила и проверки:
+     * - Требуется активное соединение с модулем, иначе ошибка `40507`.
+     * - Ошибка десериализации настроек — `40402`.
+     * - Некорректный `mode` — `40501`.
+     * - Нарушение ограничений по массиву/параметрам моторов — `40502..40505`.
+     * 
+     * @param u Информация о пользователе
+     * @param message Сериализованный `mms::MotorsSettings`
+     */
     void moving(const uinfo &u, const std::string &message);
+    /**
+     * @brief Команда reconnect(id)
+     * 
+     * Принимает сериализованный `mms::Device` с `deviceId` и пытается подключиться
+     * к указанному устройству.
+     * 
+     * Правила и проверки:
+     * - Ошибка десериализации `mms::Device` — `40403`.
+     * - `deviceId < 0` — ошибка `40509`.
+     * - Неудачное подключение — ошибка `40510`.
+     * 
+     * Ответ при успехе:
+     * - `status = 0`, `what = ""`, `subMessage = ""`.
+     * 
+     * @param u Информация о пользователе
+     * @param message Сериализованный `mms::Device`
+     */
     void reconnect(const uinfo &u, const std::string &message);
+    /**
+     * @brief Команда disconnect()
+     * 
+     * Отключает текущее устройство от модуля.
+     * 
+     * Правила и проверки:
+     * - Сообщение `message` обязано быть пустым, иначе ошибка `40506`.
+     * - Требуется активное соединение с модулем, иначе ошибка `40507` (через checkConnection).
+     * 
+     * Ответ при успехе:
+     * - `status = 0`, `what = ""`, `subMessage = ""`.
+     * 
+     * @param u Информация о пользователе
+     * @param message Должна быть пустой строкой
+     */
     void disconnect(const uinfo &u, const std::string &message);
+    /**
+     * @brief Команда listconnect()
+     * 
+     * Возвращает список доступных устройств. Подключение к модулю не требуется.
+     * 
+     * Правила и проверки:
+     * - Сообщение `message` обязано быть пустым, иначе ошибка `40506`.
+     * 
+     * Ответ:
+     * - `status = 0`, `what = "mms::ListConnect"`, `subMessage = serialize(mms::ListConnect)`.
+     * 
+     * @param u Информация о пользователе
+     * @param message Должна быть пустой строкой
+     */
     void listconnect(const uinfo &u, const std::string &message);
 
     std::optional<pkg::Message> deserializeMessage(const uinfo &, const std::string &);

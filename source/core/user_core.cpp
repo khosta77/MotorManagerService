@@ -233,10 +233,7 @@ void UserCore::Process(const int fd, const std::string &name, const std::string 
         return;
     }
 
-    if (it != m_methods.end())
-    {
-        (this->*(it->second))(u, manager_.value().message); // Вызов метода через указатель
-    }
+    (this->*(it->second))(u, manager_.value().message); // Вызов метода через указатель
 }
 
 void UserCore::Launch() {}
@@ -333,7 +330,16 @@ void UserCore::disconnect(const uinfo &u, const std::string &message)
 
 void UserCore::listconnect(const uinfo &u, const std::string &message)
 {
-    (void)u;
-    (void)message;
+    if (checkEmptyMessage(u, message))
+        return;
+
+    mms::ListConnect list;
+    list.listConnect = m_module->listComs();
+
+    pkg::Status ok_;
+    ok_.status = 0;
+    ok_.what = "mms::ListConnect";
+    ok_.subMessage = serialize(list);
+    writeToSock(u.first, serialize(ok_));
 }
 
