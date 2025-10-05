@@ -211,8 +211,6 @@ void FT232RL::writeData(const std::vector<uchar> &frame)
             &BytesWritten);
         if (code != FT_OK)
             throw ModuleFT2xxException(code);
-        // std::cout << BytesWritten << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000));
     }
 }
 
