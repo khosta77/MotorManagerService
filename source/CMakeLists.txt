@@ -76,5 +76,5 @@ target_link_libraries(user_core
 )
 
 # Основное приложение
-#add_executable(universal_server core/main.cpp)
-#target_link_libraries(universal_server user_core module_rs232 service_host)
+add_executable(universal_server core/main.cpp)
+target_link_libraries(universal_server user_core module_rs232 service_host)
