@@ -44,7 +44,7 @@ class ServerConnector:
         if not name_to_send:
             raise ValidationError(f'Name to send had problem {name_to_send}')
 
-        data = json.dumps({"name": name_to_send}) + "\n\n"
+        data = json.dumps({"name": name_to_send}, ensure_ascii=True) + "\n\n"
         self.socket.sendall(data.encode('utf-8'))
         print(f"Sent name: {name_to_send}")
 
@@ -54,13 +54,25 @@ class ServerConnector:
             raise ValidationError(f'Not socket {self.socket}')
 
         message_id = random.randint(0, 999999)
-        data = json.dumps({"id": message_id, "text": json.dumps({"command": command, "message": message})}) + "\n\n"
+        
+        # Создаем команду как строку напрямую, избегая двойного JSON encoding
+        command_text = f'{{"command": "{command}", "message": "{message}"}}'
+        
+        # Создаем внешний объект
+        outer_command = {"id": message_id, "text": command_text}
+        
+        # Сериализуем в JSON
+        data = json.dumps(outer_command, ensure_ascii=True) + "\n\n"
         
         print(f"Sending command: {command}")
         print(f"Message: {message}")
         print(f"Data: {data}")
         
-        self.socket.sendall(data.encode('utf-8'))
+        # Отправляем как UTF-8
+        try:
+            self.socket.sendall(data.encode('utf-8'))
+        except (ConnectionResetError, BrokenPipeError, OSError) as e:
+            raise ValidationError(f'Connection lost during send: {e}')
         
         # Читаем ответ
         response = self.receive_response()
@@ -84,12 +96,24 @@ class ServerConnector:
                 break
         
         if response_data:
-            response_str = response_data.decode('utf-8').strip()
-            print(f"Received response: {response_str}")
             try:
-                return json.loads(response_str)
-            except json.JSONDecodeError:
-                return {"raw_response": response_str}
+                # Пытаемся декодировать как UTF-8
+                response_str = response_data.decode('utf-8').strip()
+                print(f"Received response: {response_str}")
+                try:
+                    return json.loads(response_str)
+                except json.JSONDecodeError as e:
+                    print(f"JSON decode error: {e}")
+                    return {"raw_response": response_str, "error": "Invalid JSON"}
+            except UnicodeDecodeError as e:
+                print(f"UTF-8 decode error: {e}")
+                # Пытаемся декодировать как latin-1 и конвертировать
+                try:
+                    response_str = response_data.decode('latin-1').strip()
+                    print(f"Received response (latin-1): {response_str}")
+                    return json.loads(response_str)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    return {"raw_response": response_data.hex(), "error": "Invalid encoding"}
         else:
             return {"error": "No response received"}
 

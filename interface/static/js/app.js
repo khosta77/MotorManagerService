@@ -1,369 +1,552 @@
-// MotorControlService Web Interface
-// JavaScript для управления интерфейсом
-
 class MotorControlApp {
     constructor() {
+        this.serverIP = '127.0.0.1';
+        this.serverPort = 38000;
         this.isConnected = false;
-        this.currentSettings = {
-            maxSpeed: 5000,
-            acceleration: 2000,
-            mode: 'synchronous'
-        };
-        this.logs = [];
+        this.deviceId = 0;
+        this.deviceName = 'Не подключено';
+        this.deviceVersion = 'Неизвестно';
+        this.devices = [];
+        this.motors = [];
+        
+        // Флаги для предотвращения множественных подключений
+        this.isConnecting = false;
+        this.isDisconnecting = false;
+        this.isConnectingDevice = false;
         
         this.init();
     }
 
     init() {
         this.bindEvents();
-        this.updateStatusIndicators();
-        this.addLog('Система инициализирована. Ожидание подключения...', 'info');
+        this.createMotorsTable();
         this.checkSystemStatus();
+        this.updateUI();
     }
 
     bindEvents() {
-        // Кнопки движения отдельных моторов
-        document.querySelectorAll('.move-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const motorRow = e.target.closest('.motor-row');
-                const motorNumber = motorRow.dataset.motor;
-                const checkbox = motorRow.querySelector('.motor-checkbox');
-                
-                if (!checkbox.checked) {
-                    this.addLog(`Мотор ${motorNumber} отключен`, 'warning');
-                    return;
-                }
-                
-                const speed = parseInt(motorRow.querySelector('.speed-input').value);
-                const acceleration = parseInt(motorRow.querySelector('.acceleration-input').value);
-                const steps = parseInt(motorRow.querySelector('.steps-input').value);
-                
-                this.moveMotor(motorNumber, steps, speed, acceleration);
-            });
-        });
-
-        // Групповые кнопки
-        document.getElementById('move-selected-btn').addEventListener('click', () => {
-            this.moveSelectedMotors();
-        });
-
-        document.getElementById('move-all-btn').addEventListener('click', () => {
-            this.moveAllMotors();
-        });
-
-        document.getElementById('calibrate-btn').addEventListener('click', () => {
-            this.calibrateMotors();
-        });
-
-        // Обработка изменений в полях ввода
-        document.querySelectorAll('.speed-input, .acceleration-input, .steps-input').forEach(input => {
-            input.addEventListener('change', () => {
-                this.validateMotorSettings(input.closest('.motor-row'));
-            });
-        });
-
-        // Сохранение настроек
-        document.getElementById('save-settings').addEventListener('click', () => {
-            this.saveSettings();
-        });
-
-        // Системные кнопки
-        document.getElementById('connect-btn').addEventListener('click', () => {
+        // Подключение к серверу
+        document.getElementById('connectBtn').addEventListener('click', () => {
             this.connectToServer();
         });
 
-        document.getElementById('disconnect-btn').addEventListener('click', () => {
-            this.disconnectFromServer();
+        // Обновление устройств
+        document.getElementById('refreshDevices').addEventListener('click', () => {
+            this.refreshDevices();
         });
 
-        document.getElementById('version-btn').addEventListener('click', () => {
+        // Подключение к устройству
+        document.getElementById('connectDevice').addEventListener('click', () => {
+            this.connectToDevice();
+        });
+
+        // Отключение от устройства
+        document.getElementById('disconnectDevice').addEventListener('click', () => {
+            this.disconnectFromDevice();
+        });
+
+        // Получение версии
+        document.getElementById('getVersion').addEventListener('click', () => {
             this.getVersion();
         });
 
-        document.getElementById('devices-btn').addEventListener('click', () => {
-            this.getDevices();
+        // Глобальные команды
+        document.getElementById('moveSelectedSync').addEventListener('click', () => {
+            this.moveSelectedMotors('synchronous');
         });
 
-        // Управление логами
-        document.getElementById('clear-logs').addEventListener('click', () => {
+        document.getElementById('moveSelectedAsync').addEventListener('click', () => {
+            this.moveSelectedMotors('asynchronous');
+        });
+
+        document.getElementById('stopAll').addEventListener('click', () => {
+            this.stopAllMotors();
+        });
+
+        // Очистка логов
+        document.getElementById('clearLogs').addEventListener('click', () => {
             this.clearLogs();
         });
 
-        document.getElementById('export-logs').addEventListener('click', () => {
-            this.exportLogs();
+        // Изменение IP/PORT
+        document.getElementById('serverIP').addEventListener('change', (e) => {
+            this.serverIP = e.target.value;
         });
 
-        // Модальные окна
-        document.getElementById('modal-close').addEventListener('click', () => {
-            this.closeModal();
-        });
-
-        // Закрытие модального окна по клику вне его
-        document.getElementById('status-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'status-modal') {
-                this.closeModal();
-            }
-        });
-
-        // Обработка изменений настроек
-        document.getElementById('max-speed').addEventListener('change', (e) => {
-            this.currentSettings.maxSpeed = parseInt(e.target.value);
-        });
-
-        document.getElementById('acceleration').addEventListener('change', (e) => {
-            this.currentSettings.acceleration = parseInt(e.target.value);
-        });
-
-        document.querySelectorAll('input[name="mode"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                this.currentSettings.mode = e.target.value;
-            });
+        document.getElementById('serverPort').addEventListener('change', (e) => {
+            this.serverPort = parseInt(e.target.value);
         });
     }
 
-    async checkSystemStatus() {
-        try {
-            const response = await fetch('/api/system/status');
-            const data = await response.json();
-            
-            if (data.status === 'success') {
-                this.isConnected = data.connected;
-                this.updateStatusIndicators();
-            }
-        } catch (error) {
-            console.error('Ошибка проверки статуса:', error);
+    createMotorsTable() {
+        const tbody = document.getElementById('motorsTableBody');
+        tbody.innerHTML = '';
+
+        for (let i = 1; i <= 10; i++) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <input type="checkbox" class="motor-checkbox" id="motor${i}Check" data-motor="${i}">
+                </td>
+                <td>
+                    <span class="motor-number">Мотор ${i}</span>
+                </td>
+                <td>
+                    <input type="number" class="motor-input" id="motor${i}Acceleration" value="2000" min="1" max="10000">
+                </td>
+                <td>
+                    <input type="number" class="motor-input" id="motor${i}MaxSpeed" value="5000" min="1" max="20000">
+                </td>
+                <td>
+                    <input type="number" class="motor-input" id="motor${i}Step" value="0" min="-10000" max="10000">
+                </td>
+                <td>
+                    <button class="btn btn-primary motor-move-btn" onclick="motorControlApp.moveSingleMotor(${i})">
+                        <i class="fas fa-play"></i> Запустить
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
         }
     }
 
-    async moveMotor(motorNumber, step, speed = 5000, acceleration = 2000) {
-        this.addLog(`Движение мотора ${motorNumber} на ${step} шагов (скорость: ${speed}, ускорение: ${acceleration})`, 'info');
-
-        try {
-            const response = await fetch('/api/motor/move', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    motor: parseInt(motorNumber),
-                    step: step,
-                    mode: this.currentSettings.mode,
-                    acceleration: acceleration,
-                    maxSpeed: speed
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.status === 'success') {
-                this.addLog(`Мотор ${motorNumber} успешно перемещен`, 'success');
-                this.showNotification(`Мотор ${motorNumber} перемещен на ${step} шагов`, 'success');
-            } else {
-                this.addLog(`Ошибка движения мотора ${motorNumber}: ${data.message}`, 'error');
-                this.showNotification(`Ошибка: ${data.message}`, 'error');
-            }
-        } catch (error) {
-            this.addLog(`Ошибка связи: ${error.message}`, 'error');
-            this.showNotification('Ошибка связи с сервером', 'error');
-        }
-    }
-
-    async moveSelectedMotors() {
-        const selectedMotors = [];
-        
-        document.querySelectorAll('.motor-row').forEach(row => {
-            const checkbox = row.querySelector('.motor-checkbox');
-            if (checkbox.checked) {
-                const motorNumber = row.dataset.motor;
-                const speed = parseInt(row.querySelector('.speed-input').value);
-                const acceleration = parseInt(row.querySelector('.acceleration-input').value);
-                const steps = parseInt(row.querySelector('.steps-input').value);
-                
-                selectedMotors.push({
-                    number: parseInt(motorNumber),
-                    acceleration: acceleration,
-                    maxSpeed: speed,
-                    step: steps
-                });
-            }
-        });
-
-        if (selectedMotors.length === 0) {
-            this.addLog('Не выбрано ни одного мотора для движения', 'warning');
+    async connectToServer() {
+        if (this.isConnecting) {
+            this.showNotification('Подключение уже выполняется...', 'warning');
             return;
         }
-
+        
+        this.isConnecting = true;
         try {
-            this.addLog(`Движение ${selectedMotors.length} выбранных моторов...`, 'info');
+            this.log('Попытка подключения к серверу...', 'info');
             
-            const response = await fetch('/api/motor/move-multiple', {
+            const response = await fetch('/api/system/connect', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    motors: selectedMotors,
-                    mode: this.currentSettings.mode
+                    ip: this.serverIP,
+                    port: this.serverPort
                 })
             });
 
             const result = await response.json();
             
             if (result.status === 'success') {
-                this.addLog(`Успешно выполнено движение ${selectedMotors.length} моторов`, 'success');
-                this.showNotification(`Движение ${selectedMotors.length} моторов выполнено`, 'success');
+                this.isConnected = true;
+                this.log('Подключение к серверу установлено', 'success');
+                this.showNotification('Подключение к серверу установлено', 'success');
             } else {
-                this.addLog(`Ошибка группового движения: ${result.message}`, 'error');
-                this.showNotification(`Ошибка: ${result.message}`, 'error');
+                throw new Error(result.message || 'Ошибка подключения');
             }
         } catch (error) {
-            this.addLog(`Ошибка при групповом движении: ${error.message}`, 'error');
-            this.showNotification(`Ошибка: ${error.message}`, 'error');
+            this.log(`Ошибка подключения к серверу: ${error.message}`, 'error');
+            this.showNotification(`Ошибка подключения: ${error.message}`, 'error');
+        } finally {
+            this.isConnecting = false;
         }
+        
+        this.updateUI();
     }
 
-    async moveAllMotors() {
-        // Включаем все моторы
-        document.querySelectorAll('.motor-checkbox').forEach(checkbox => {
-            checkbox.checked = true;
-        });
-        
-        // Выполняем движение всех моторов
-        await this.moveSelectedMotors();
-    }
-
-    validateMotorSettings(motorRow) {
-        const speed = parseInt(motorRow.querySelector('.speed-input').value);
-        const acceleration = parseInt(motorRow.querySelector('.acceleration-input').value);
-        const steps = parseInt(motorRow.querySelector('.steps-input').value);
-        
-        // Валидация значений
-        if (speed < 1 || speed > 99999) {
-            motorRow.querySelector('.speed-input').style.borderColor = '#f56565';
-            this.addLog('Скорость должна быть от 1 до 99999', 'warning');
-        } else {
-            motorRow.querySelector('.speed-input').style.borderColor = '#38b2ac';
+    async refreshDevices() {
+        if (!this.isConnected) {
+            this.showNotification('Сначала подключитесь к серверу', 'warning');
+            return;
         }
-        
-        if (acceleration < 1 || acceleration > 99999) {
-            motorRow.querySelector('.acceleration-input').style.borderColor = '#f56565';
-            this.addLog('Ускорение должно быть от 1 до 99999', 'warning');
-        } else {
-            motorRow.querySelector('.acceleration-input').style.borderColor = '#ed8936';
-        }
-        
-        if (isNaN(steps)) {
-            motorRow.querySelector('.steps-input').style.borderColor = '#f56565';
-            this.addLog('Количество шагов должно быть числом', 'warning');
-        } else {
-            motorRow.querySelector('.steps-input').style.borderColor = '#4299e1';
-        }
-    }
-
-    async moveMotorsDiagonal(motors, steps) {
-        const motorCommands = motors.map((motor, index) => ({
-            number: parseInt(motor),
-            acceleration: this.currentSettings.acceleration,
-            maxSpeed: this.currentSettings.maxSpeed,
-            step: parseInt(steps[index])
-        }));
-
-        this.addLog(`Диагональное движение: моторы ${motors.join(', ')}`, 'info');
 
         try {
-            const response = await fetch('/api/motor/move-multiple', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    motors: motorCommands,
-                    mode: 'asynchronous' // Диагональные движения всегда асинхронные
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.status === 'success') {
-                this.addLog(`Диагональное движение выполнено`, 'success');
-                this.showNotification('Диагональное движение выполнено', 'success');
-            } else {
-                this.addLog(`Ошибка диагонального движения: ${data.message}`, 'error');
-                this.showNotification(`Ошибка: ${data.message}`, 'error');
-            }
-        } catch (error) {
-            this.addLog(`Ошибка связи: ${error.message}`, 'error');
-            this.showNotification('Ошибка связи с сервером', 'error');
-        }
-    }
-
-    async calibrateMotors() {
-        this.addLog('Начало калибровки (абсолютный ноль)', 'info');
-
-        try {
-            const response = await fetch('/api/motor/move-multiple', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    motors: [
-                        { number: 1, acceleration: this.currentSettings.acceleration, maxSpeed: this.currentSettings.maxSpeed, step: -100000 },
-                        { number: 2, acceleration: this.currentSettings.acceleration, maxSpeed: this.currentSettings.maxSpeed, step: -100000 },
-                        { number: 3, acceleration: this.currentSettings.acceleration, maxSpeed: this.currentSettings.maxSpeed, step: -100000 },
-                        { number: 4, acceleration: this.currentSettings.acceleration, maxSpeed: this.currentSettings.maxSpeed, step: -100000 }
-                    ],
-                    mode: 'synchronous'
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.status === 'success') {
-                this.addLog('Калибровка завершена успешно', 'success');
-                this.showNotification('Калибровка завершена', 'success');
-            } else {
-                this.addLog(`Ошибка калибровки: ${data.message}`, 'error');
-                this.showNotification(`Ошибка калибровки: ${data.message}`, 'error');
-            }
-        } catch (error) {
-            this.addLog(`Ошибка связи: ${error.message}`, 'error');
-            this.showNotification('Ошибка связи с сервером', 'error');
-        }
-    }
-
-    async connectToServer() {
-        try {
-            this.addLog('Подключение к серверу...', 'info');
+            this.log('Обновление списка устройств...', 'info');
             
-            const response = await fetch('/api/system/connect', {
+            const response = await fetch('/api/system/devices');
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                this.devices = result.devices || [];
+                this.log(`Найдено устройств: ${this.devices.length}`, 'success');
+                this.showNotification(`Найдено устройств: ${this.devices.length}`, 'success');
+                
+                // Обновляем отображение устройств
+                this.updateDeviceDisplay();
+            } else {
+                throw new Error(result.message || 'Ошибка получения устройств');
+            }
+        } catch (error) {
+            this.log(`Ошибка получения устройств: ${error.message}`, 'error');
+            this.showNotification(`Ошибка получения устройств: ${error.message}`, 'error');
+        }
+    }
+
+    updateDeviceDisplay() {
+        // Создаем выпадающий список устройств
+        const deviceSelect = document.createElement('select');
+        deviceSelect.id = 'deviceSelect';
+        deviceSelect.innerHTML = '<option value="">Выберите устройство...</option>';
+        
+        this.devices.forEach((device, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = `ID: ${index} - ${this.cleanDeviceName(device)}`;
+            deviceSelect.appendChild(option);
+        });
+
+        // Заменяем старый элемент или добавляем новый
+        const existingSelect = document.getElementById('deviceSelect');
+        if (existingSelect) {
+            existingSelect.parentNode.replaceChild(deviceSelect, existingSelect);
+        } else {
+            const deviceActions = document.querySelector('.device-actions');
+            deviceActions.insertBefore(deviceSelect, deviceActions.firstChild);
+        }
+
+        // Добавляем обработчик изменения выбора
+        deviceSelect.addEventListener('change', (e) => {
+            this.deviceId = parseInt(e.target.value);
+            this.updateUI();
+        });
+    }
+
+    cleanDeviceName(deviceName) {
+        // Очищаем имя устройства от непечатаемых символов
+        return deviceName.replace(/[\x00-\x1F\x7F-\x9F]/g, '').substring(0, 50);
+    }
+
+    async connectToDevice() {
+        if (!this.isConnected) {
+            this.showNotification('Сначала подключитесь к серверу', 'warning');
+            return;
+        }
+
+        if (this.isConnectingDevice) {
+            this.showNotification('Подключение к устройству уже выполняется...', 'warning');
+            return;
+        }
+
+        this.isConnectingDevice = true;
+        try {
+            this.log(`Подключение к устройству ID: ${this.deviceId}`, 'info');
+            
+            const response = await fetch('/api/system/connect-device', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    deviceId: this.deviceId
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                this.deviceName = result.deviceName || 'Подключено';
+                this.log(`Подключено к устройству: ${this.deviceName}`, 'success');
+                this.showNotification(`Подключено к устройству: ${this.deviceName}`, 'success');
+            } else {
+                throw new Error(result.message || 'Ошибка подключения к устройству');
+            }
+        } catch (error) {
+            this.log(`Ошибка подключения к устройству: ${error.message}`, 'error');
+            this.showNotification(`Ошибка подключения к устройству: ${error.message}`, 'error');
+        } finally {
+            this.isConnectingDevice = false;
+        }
+        
+        this.updateUI();
+    }
+
+    async disconnectFromDevice() {
+        if (this.isDisconnecting) {
+            this.showNotification('Отключение от устройства уже выполняется...', 'warning');
+            return;
+        }
+
+        this.isDisconnecting = true;
+        try {
+            this.log('Отключение от устройства...', 'info');
+            
+            const response = await fetch('/api/system/disconnect-device', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 }
             });
 
-            const data = await response.json();
-
-            if (data.status === 'success') {
-                this.isConnected = true;
-                this.updateStatusIndicators();
-                this.addLog('Подключение к серверу установлено', 'success');
-                this.showNotification('Подключение установлено', 'success');
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                this.deviceName = 'Не подключено';
+                this.deviceId = 0;
+                this.deviceVersion = 'Неизвестно';
+                this.log('Отключено от устройства', 'success');
+                this.showNotification('Отключено от устройства', 'success');
             } else {
-                this.addLog(`Ошибка подключения: ${data.message}`, 'error');
-                this.showNotification(`Ошибка подключения: ${data.message}`, 'error');
+                throw new Error(result.message || 'Ошибка отключения');
             }
-
         } catch (error) {
-            this.addLog(`Ошибка подключения: ${error.message}`, 'error');
-            this.showNotification('Ошибка подключения', 'error');
+            this.log(`Ошибка отключения: ${error.message}`, 'error');
+            this.showNotification(`Ошибка отключения: ${error.message}`, 'error');
+        } finally {
+            this.isDisconnecting = false;
+        }
+        
+        this.updateUI();
+    }
+
+    async getVersion() {
+        if (!this.isConnected) {
+            this.showNotification('Сначала подключитесь к серверу', 'warning');
+            return;
+        }
+
+        try {
+            this.log('Получение версии MCU...', 'info');
+            
+            const response = await fetch('/api/system/version');
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                // Извлекаем версию из ответа
+                let version = 'Неизвестно';
+                if (result.response && result.response.subMessage) {
+                    try {
+                        const versionData = JSON.parse(result.response.subMessage);
+                        if (versionData.version) {
+                            version = versionData.version;
+                        }
+                    } catch (e) {
+                        // Если не удалось распарсить, используем raw ответ
+                        version = result.response.subMessage;
+                    }
+                }
+                
+                this.deviceVersion = version;
+                this.log(`Версия MCU: ${version}`, 'success');
+                this.showNotification(`Версия MCU: ${version}`, 'success');
+        } else {
+                // Ошибка от сервера - показываем реальное сообщение об ошибке
+                this.log(`Ошибка получения версии: ${result.message}`, 'error');
+                this.showNotification(`Ошибка получения версии: ${result.message}`, 'error');
+                this.deviceVersion = 'Ошибка';
+            }
+        } catch (error) {
+            this.log(`Ошибка получения версии: ${error.message}`, 'error');
+            this.showNotification(`Ошибка получения версии: ${error.message}`, 'error');
+            this.deviceVersion = 'Ошибка';
+        }
+        
+        this.updateUI();
+    }
+
+    async moveSingleMotor(motorNumber) {
+        if (!this.isConnected) {
+            this.showNotification('Сначала подключитесь к серверу', 'warning');
+            return;
+        }
+
+        const acceleration = parseInt(document.getElementById(`motor${motorNumber}Acceleration`).value);
+        const maxSpeed = parseInt(document.getElementById(`motor${motorNumber}MaxSpeed`).value);
+        const step = parseInt(document.getElementById(`motor${motorNumber}Step`).value);
+
+        try {
+            this.log(`Движение мотора ${motorNumber}: шаг=${step}, скорость=${maxSpeed}, ускорение=${acceleration}`, 'info');
+            
+            const response = await fetch('/api/motor/move', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    motorNumber: motorNumber,
+                    step: step,
+                    maxSpeed: maxSpeed,
+                    acceleration: acceleration
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                this.log(`Мотор ${motorNumber} запущен`, 'success');
+                this.showNotification(`Мотор ${motorNumber} запущен`, 'success');
+            } else {
+                throw new Error(result.message || 'Ошибка движения мотора');
+            }
+        } catch (error) {
+            this.log(`Ошибка движения мотора ${motorNumber}: ${error.message}`, 'error');
+            this.showNotification(`Ошибка движения мотора ${motorNumber}: ${error.message}`, 'error');
         }
     }
 
-    async disconnectFromServer() {
+    async moveSelectedMotors(mode) {
+        if (!this.isConnected) {
+            this.showNotification('Сначала подключитесь к серверу', 'warning');
+            return;
+        }
+
+        const selectedMotors = [];
+        
+        for (let i = 1; i <= 10; i++) {
+            const checkbox = document.getElementById(`motor${i}Check`);
+            if (checkbox.checked) {
+                const acceleration = parseInt(document.getElementById(`motor${i}Acceleration`).value);
+                const maxSpeed = parseInt(document.getElementById(`motor${i}MaxSpeed`).value);
+                const step = parseInt(document.getElementById(`motor${i}Step`).value);
+                
+                selectedMotors.push({
+                    number: i,
+                    acceleration: acceleration,
+                    maxSpeed: maxSpeed,
+                    step: step
+                });
+            }
+        }
+
+        if (selectedMotors.length === 0) {
+            this.showNotification('Выберите хотя бы один мотор', 'warning');
+            return;
+        }
+
         try {
-            this.addLog('Отключение от сервера...', 'info');
+            this.log(`Движение ${selectedMotors.length} моторов в ${mode} режиме`, 'info');
+            
+            const response = await fetch('/api/motor/move-multiple', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    mode: mode,
+                    motors: selectedMotors
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                this.log(`Выполнено движение ${selectedMotors.length} моторов в ${mode} режиме`, 'success');
+                this.showNotification(`Выполнено движение ${selectedMotors.length} моторов`, 'success');
+            } else {
+                throw new Error(result.message || 'Ошибка движения моторов');
+            }
+        } catch (error) {
+            this.log(`Ошибка движения моторов: ${error.message}`, 'error');
+            this.showNotification(`Ошибка движения моторов: ${error.message}`, 'error');
+        }
+    }
+
+    async stopAllMotors() {
+        if (!this.isConnected) {
+            this.showNotification('Сначала подключитесь к серверу', 'warning');
+            return;
+        }
+
+        try {
+            this.log('Остановка всех моторов...', 'info');
+            
+            const response = await fetch('/api/motor/stop-all', {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                this.log('Все моторы остановлены', 'success');
+                this.showNotification('Все моторы остановлены', 'success');
+            } else {
+                throw new Error(result.message || 'Ошибка остановки моторов');
+            }
+        } catch (error) {
+            this.log(`Ошибка остановки моторов: ${error.message}`, 'error');
+            this.showNotification(`Ошибка остановки моторов: ${error.message}`, 'error');
+        }
+    }
+
+    async checkSystemStatus() {
+        try {
+            const response = await fetch('/api/system/status');
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                this.isConnected = result.connected;
+                document.getElementById('serverStatusText').textContent = result.server || 'Неизвестно';
+                document.getElementById('mcuStatus').textContent = result.mcu || 'Неизвестно';
+                document.getElementById('deviceStatusText').textContent = result.device || 'Неизвестно';
+            }
+        } catch (error) {
+            this.log(`Ошибка проверки статуса: ${error.message}`, 'error');
+        }
+        
+        this.updateUI();
+    }
+
+    updateUI() {
+        // Обновление статуса подключения к серверу
+        const serverStatus = document.getElementById('serverStatus');
+        const connectBtn = document.getElementById('connectBtn');
+        
+        if (this.isConnected) {
+            serverStatus.innerHTML = '<i class="fas fa-circle"></i> Подключен';
+            serverStatus.className = 'status-indicator connected';
+            connectBtn.innerHTML = '<i class="fas fa-unlink"></i> Отключиться';
+            connectBtn.onclick = () => this.disconnectFromServer();
+        } else {
+            serverStatus.innerHTML = '<i class="fas fa-circle"></i> Отключен';
+            serverStatus.className = 'status-indicator';
+            connectBtn.innerHTML = '<i class="fas fa-plug"></i> Подключиться';
+            connectBtn.onclick = () => this.connectToServer();
+        }
+
+        // Блокируем кнопку подключения во время операций
+        connectBtn.disabled = this.isConnecting || this.isDisconnecting;
+
+        // Обновление информации об устройстве
+        document.getElementById('deviceId').textContent = this.deviceId;
+        document.getElementById('deviceName').textContent = this.deviceName;
+        document.getElementById('deviceVersion').textContent = this.deviceVersion;
+
+        // Обновление статусов
+        const serverStatusText = document.getElementById('serverStatusText');
+        const deviceStatusText = document.getElementById('deviceStatusText');
+        
+        if (this.isConnected) {
+            serverStatusText.textContent = 'Подключен';
+            serverStatusText.className = 'status-value connected';
+        } else {
+            serverStatusText.textContent = 'Отключен';
+            serverStatusText.className = 'status-value disconnected';
+        }
+
+        if (this.deviceName !== 'Не подключено') {
+            deviceStatusText.textContent = 'Подключено';
+            deviceStatusText.className = 'status-value connected';
+        } else {
+            deviceStatusText.textContent = 'Отключено';
+            deviceStatusText.className = 'status-value disconnected';
+        }
+
+        // Обновление доступности кнопок
+        const refreshBtn = document.getElementById('refreshDevices');
+        const getVersionBtn = document.getElementById('getVersion');
+        const connectDeviceBtn = document.getElementById('connectDevice');
+        const disconnectDeviceBtn = document.getElementById('disconnectDevice');
+        
+        refreshBtn.disabled = !this.isConnected || this.isConnecting || this.isDisconnecting;
+        getVersionBtn.disabled = !this.isConnected || this.isConnecting || this.isDisconnecting;
+        connectDeviceBtn.disabled = !this.isConnected || this.isConnecting || this.isDisconnecting || this.isConnectingDevice;
+        disconnectDeviceBtn.disabled = !this.isConnected || this.deviceName === 'Не подключено' || this.isConnecting || this.isDisconnecting;
+    }
+
+    async disconnectFromServer() {
+        if (this.isDisconnecting) {
+            this.showNotification('Отключение уже выполняется...', 'warning');
+            return;
+        }
+        
+        this.isDisconnecting = true;
+        try {
+            this.log('Отключение от сервера...', 'info');
             
             const response = await fetch('/api/system/disconnect', {
                 method: 'POST',
@@ -372,228 +555,69 @@ class MotorControlApp {
                 }
             });
 
-            const data = await response.json();
+            const result = await response.json();
 
-            if (data.status === 'success') {
+            if (result.status === 'success') {
                 this.isConnected = false;
-                this.updateStatusIndicators();
-                this.addLog('Отключение от сервера выполнено', 'info');
-                this.showNotification('Отключение выполнено', 'info');
+                this.deviceName = 'Не подключено';
+                this.deviceId = 0;
+                this.deviceVersion = 'Неизвестно';
+                this.devices = [];
+                this.log('Отключено от сервера', 'success');
+                this.showNotification('Отключено от сервера', 'success');
             } else {
-                this.addLog(`Ошибка отключения: ${data.message}`, 'error');
-                this.showNotification(`Ошибка отключения: ${data.message}`, 'error');
-            }
-
-        } catch (error) {
-            this.addLog(`Ошибка отключения: ${error.message}`, 'error');
-        }
-    }
-
-    async getVersion() {
-        try {
-            const response = await fetch('/api/system/version');
-            const data = await response.json();
-
-            if (data.status === 'success') {
-                const version = data.response?.what || 'Неизвестно';
-                this.showModal('Версия MCU', `Версия прошивки: ${version}`);
-                this.addLog(`Версия MCU: ${version}`, 'info');
-            } else {
-                this.addLog(`Ошибка получения версии: ${data.message}`, 'error');
-                this.showNotification(`Ошибка получения версии: ${data.message}`, 'error');
+                throw new Error(result.message || 'Ошибка отключения от сервера');
             }
         } catch (error) {
-            this.addLog(`Ошибка получения версии: ${error.message}`, 'error');
-            this.showNotification('Ошибка получения версии', 'error');
+            this.log(`Ошибка отключения от сервера: ${error.message}`, 'error');
+            this.showNotification(`Ошибка отключения: ${error.message}`, 'error');
+        } finally {
+            this.isDisconnecting = false;
         }
+        
+        this.updateUI();
     }
 
-    async getDevices() {
-        try {
-            const response = await fetch('/api/system/devices');
-            const data = await response.json();
-
-            if (data.status === 'success') {
-                const devices = data.response?.subMessage ? JSON.parse(data.response.subMessage) : {};
-                const deviceList = devices.listConnect?.join(', ') || 'Не найдено';
-                this.showModal('Список устройств', `Доступные устройства: ${deviceList}`);
-                this.addLog(`Список устройств: ${deviceList}`, 'info');
-            } else {
-                this.addLog(`Ошибка получения списка устройств: ${data.message}`, 'error');
-                this.showNotification(`Ошибка получения списка устройств: ${data.message}`, 'error');
-            }
-        } catch (error) {
-            this.addLog(`Ошибка получения списка устройств: ${error.message}`, 'error');
-            this.showNotification('Ошибка получения списка устройств', 'error');
-        }
+    clearLogs() {
+        const logsContainer = document.getElementById('logsContainer');
+        logsContainer.innerHTML = `
+            <div class="log-entry info">
+                <span class="log-time">[${new Date().toLocaleTimeString()}]</span>
+                <span class="log-level">INFO</span>
+                <span class="log-message">Логи очищены</span>
+            </div>
+        `;
     }
 
-    async saveSettings() {
-        try {
-            const response = await fetch('/api/settings/save', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(this.currentSettings)
-            });
-
-            const data = await response.json();
-
-            if (data.status === 'success') {
-                this.addLog('Настройки сохранены', 'success');
-                this.showNotification('Настройки сохранены', 'success');
-            } else {
-                this.addLog(`Ошибка сохранения настроек: ${data.message}`, 'error');
-                this.showNotification(`Ошибка сохранения настроек: ${data.message}`, 'error');
-            }
-        } catch (error) {
-            this.addLog(`Ошибка сохранения настроек: ${error.message}`, 'error');
-            this.showNotification('Ошибка сохранения настроек', 'error');
-        }
-    }
-
-    updateStatusIndicators() {
-        const serverStatus = document.querySelector('#server-status .status-dot');
-        const mcuStatus = document.querySelector('#mcu-status .status-dot');
-        const deviceStatus = document.querySelector('#device-status .status-dot');
-
-        if (this.isConnected) {
-            serverStatus.className = 'status-dot online';
-            mcuStatus.className = 'status-dot online';
-            deviceStatus.className = 'status-dot online';
-        } else {
-            serverStatus.className = 'status-dot offline';
-            mcuStatus.className = 'status-dot offline';
-            deviceStatus.className = 'status-dot offline';
-        }
-    }
-
-    addLog(message, level = 'info') {
-        const timestamp = new Date().toLocaleTimeString();
-        const logEntry = {
-            time: timestamp,
-            level: level,
-            message: message
-        };
-
-        this.logs.push(logEntry);
-
-        const logsContainer = document.getElementById('logs-container');
-        const logElement = document.createElement('div');
-        logElement.className = `log-entry ${level}`;
-        logElement.innerHTML = `
-            <span class="log-time">[${timestamp}]</span>
+    log(message, level = 'info') {
+        const logsContainer = document.getElementById('logsContainer');
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry ${level}`;
+        logEntry.innerHTML = `
+            <span class="log-time">[${new Date().toLocaleTimeString()}]</span>
             <span class="log-level">${level.toUpperCase()}</span>
             <span class="log-message">${message}</span>
         `;
 
-        logsContainer.appendChild(logElement);
+        logsContainer.appendChild(logEntry);
         logsContainer.scrollTop = logsContainer.scrollHeight;
-
-        // Ограничиваем количество логов
-        if (this.logs.length > 100) {
-            this.logs.shift();
-            logsContainer.removeChild(logsContainer.firstChild);
-        }
-    }
-
-    clearLogs() {
-        this.logs = [];
-        document.getElementById('logs-container').innerHTML = '';
-        this.addLog('Логи очищены', 'info');
-    }
-
-    async exportLogs() {
-        try {
-            const response = await fetch('/api/logs/export');
-            const data = await response.json();
-
-            if (data.status === 'success') {
-                const logText = this.logs.map(log => 
-                    `[${log.time}] ${log.level.toUpperCase()}: ${log.message}`
-                ).join('\n');
-
-                const blob = new Blob([logText], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `motor-control-logs-${new Date().toISOString().split('T')[0]}.txt`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                this.addLog('Логи экспортированы', 'success');
-                this.showNotification('Логи экспортированы', 'success');
-            } else {
-                this.addLog(`Ошибка экспорта логов: ${data.message}`, 'error');
-                this.showNotification(`Ошибка экспорта логов: ${data.message}`, 'error');
-            }
-        } catch (error) {
-            this.addLog(`Ошибка экспорта логов: ${error.message}`, 'error');
-            this.showNotification('Ошибка экспорта логов', 'error');
-        }
-    }
-
-    showModal(title, content) {
-        document.getElementById('modal-title').textContent = title;
-        document.getElementById('modal-body').innerHTML = `<p>${content}</p>`;
-        document.getElementById('status-modal').classList.add('show');
-    }
-
-    closeModal() {
-        document.getElementById('status-modal').classList.remove('show');
     }
 
     showNotification(message, type = 'info') {
+        const container = document.getElementById('notifications');
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
-        notification.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-${this.getNotificationIcon(type)}"></i>
-                <span>${message}</span>
-            </div>
-        `;
-
-        document.getElementById('notifications').appendChild(notification);
-
-        // Автоматическое удаление через 5 секунд
+        notification.textContent = message;
+        
+        container.appendChild(notification);
+        
         setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
+            notification.remove();
         }, 5000);
-    }
-
-    getNotificationIcon(type) {
-        const icons = {
-            success: 'check-circle',
-            error: 'exclamation-circle',
-            warning: 'exclamation-triangle',
-            info: 'info-circle'
-        };
-        return icons[type] || 'info-circle';
     }
 }
 
-// Инициализация приложения при загрузке страницы
+// Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
     window.motorControlApp = new MotorControlApp();
-});
-
-// Обработка ошибок
-window.addEventListener('error', (e) => {
-    console.error('Ошибка JavaScript:', e.error);
-    if (window.motorControlApp) {
-        window.motorControlApp.addLog(`JavaScript ошибка: ${e.error.message}`, 'error');
-    }
-});
-
-// Обработка необработанных промисов
-window.addEventListener('unhandledrejection', (e) => {
-    console.error('Необработанная ошибка Promise:', e.reason);
-    if (window.motorControlApp) {
-        window.motorControlApp.addLog(`Promise ошибка: ${e.reason}`, 'error');
-    }
 });

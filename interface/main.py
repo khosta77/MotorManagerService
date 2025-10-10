@@ -31,12 +31,25 @@ def ensure_connection():
         if connector is None:
             connector = ServerConnector(IP, PORT, MYNAME)
             # Подключаемся к FT232RL устройству
-            connector.send_command("listconnect", "")
-            connector.send_command("reconnect", json.dumps({"deviceId": 0}))
+            try:
+                connector.send_command("listconnect", "")
+                connector.send_command("reconnect", json.dumps({"deviceId": 0}))
+            except Exception as e:
+                print(f"Warning: Could not auto-connect to device: {e}")
+        else:
+            # Проверяем, что соединение еще активно
+            try:
+                # Пробуем отправить простую команду для проверки соединения
+                connector.send_command("listconnect", "")
+            except Exception as e:
+                # Если соединение потеряно, создаем новое
+                print(f"Connection lost, reconnecting: {e}")
+                connector = None
+                connector = ServerConnector(IP, PORT, MYNAME)
         return True
     except Exception as e:
         connector = None
-        raise Exception(f"Ошибка подключения: {e}")
+        raise Exception(f"Ошибка подключения к MotorControlService: {e}")
 
 @app.route('/api/motor/move', methods=['POST'])
 def move_motor():
@@ -45,9 +58,10 @@ def move_motor():
         data = request.get_json()
         log_json("ПОЛУЧЕН JSON (движение мотора)", data)
         
-        motor_number = data.get('motor')
+        motor_number = data.get('motorNumber')
         step = data.get('step')
-        mode = data.get('mode', 'synchronous')
+        acceleration = data.get('acceleration', 2000)
+        max_speed = data.get('maxSpeed', 5000)
         
         if not motor_number or step is None:
             error_response = {
@@ -61,15 +75,15 @@ def move_motor():
         
         motor_command = {
             "number": int(motor_number),
-            "acceleration": data.get('acceleration', 2000),
-            "maxSpeed": data.get('maxSpeed', 5000),
+            "acceleration": int(acceleration),
+            "maxSpeed": int(max_speed),
             "step": int(step)
         }
 
         command = {
             "command": "moving",
             "message": json.dumps({
-                "mode": mode,
+                "mode": "synchronous",
                 "motors": [motor_command]
             })
         }
@@ -78,13 +92,25 @@ def move_motor():
         response = connector.send_command(command["command"], command["message"])
         log_json("ПОЛУЧЕН ОТВЕТ ОТ MOTORCONTROLSERVICE", response)
         
-        success_response = {
-            'status': 'success',
-            'message': f'Мотор {motor_number} перемещен на {step} шагов',
-            'response': response
-        }
-        log_json("ОТПРАВЛЕН JSON (успех)", success_response)
-        return jsonify(success_response)
+        # Проверяем статус ответа от сервера
+        if response.get('status') == 0:
+            success_response = {
+                'status': 'success',
+                'message': f'Мотор {motor_number} перемещен на {step} шагов',
+                'response': response
+            }
+            log_json("ОТПРАВЛЕН JSON (успех)", success_response)
+            return jsonify(success_response)
+        else:
+            # Ошибка от сервера
+            error_message = response.get('what', 'Неизвестная ошибка')
+            error_response = {
+                'status': 'error',
+                'message': f'Ошибка движения мотора: {error_message}',
+                'response': response
+            }
+            log_json("ОТПРАВЛЕН JSON (ошибка)", error_response)
+            return jsonify(error_response), 400
 
     except Exception as e:
         error_response = {
@@ -135,13 +161,25 @@ def move_multiple_motors():
         response = connector.send_command(command["command"], command["message"])
         log_json("ПОЛУЧЕН ОТВЕТ ОТ MOTORCONTROLSERVICE", response)
         
-        success_response = {
-            'status': 'success',
-            'message': f'Выполнено движение {len(motors)} моторов',
-            'response': response
-        }
-        log_json("ОТПРАВЛЕН JSON (успех)", success_response)
-        return jsonify(success_response)
+        # Проверяем статус ответа от сервера
+        if response.get('status') == 0:
+            success_response = {
+                'status': 'success',
+                'message': f'Выполнено движение {len(motors)} моторов',
+                'response': response
+            }
+            log_json("ОТПРАВЛЕН JSON (успех)", success_response)
+            return jsonify(success_response)
+        else:
+            # Ошибка от сервера
+            error_message = response.get('what', 'Неизвестная ошибка')
+            error_response = {
+                'status': 'error',
+                'message': f'Ошибка движения моторов: {error_message}',
+                'response': response
+            }
+            log_json("ОТПРАВЛЕН JSON (ошибка)", error_response)
+            return jsonify(error_response), 400
 
     except Exception as e:
         error_response = {
@@ -154,8 +192,16 @@ def move_multiple_motors():
 @app.route('/api/system/connect', methods=['POST'])
 def connect_to_server():
     """Подключение к серверу"""
+    global IP, PORT
     try:
-        log_json("ПОЛУЧЕН JSON (подключение к серверу)", request.get_json() or {})
+        data = request.get_json() or {}
+        log_json("ПОЛУЧЕН JSON (подключение к серверу)", data)
+        
+        # Обновляем IP и PORT если переданы
+        if 'ip' in data:
+            IP = data['ip']
+        if 'port' in data:
+            PORT = int(data['port'])
         
         ensure_connection()
         
@@ -179,10 +225,13 @@ def disconnect_from_server():
     """Отключение от сервера"""
     global connector
     try:
-        log_json("ПОЛУЧЕН JSON (отключение от сервера)", request.get_json() or {})
+        log_json("ПОЛУЧЕН ЗАПРОС (отключение от сервера)", {})
         
         if connector:
-            connector.send_command("disconnect", "")
+            try:
+                connector.send_command("disconnect", "")
+            except:
+                pass  # Игнорируем ошибки при отключении
             connector.close()
             connector = None
         
@@ -211,13 +260,26 @@ def get_version():
         response = connector.send_command("version", "")
         log_json("ПОЛУЧЕН ОТВЕТ ОТ MOTORCONTROLSERVICE", response)
         
-        success_response = {
-            'status': 'success',
-            'message': 'Версия получена',
-            'response': response
-        }
-        log_json("ОТПРАВЛЕН JSON (успех)", success_response)
-        return jsonify(success_response)
+        # Проверяем статус ответа от сервера
+        if response.get('status') == 0:
+            # Успешный ответ
+            success_response = {
+                'status': 'success',
+                'message': 'Версия получена',
+                'response': response
+            }
+            log_json("ОТПРАВЛЕН JSON (успех)", success_response)
+            return jsonify(success_response)
+        else:
+            # Ошибка от сервера
+            error_message = response.get('what', 'Неизвестная ошибка')
+            error_response = {
+                'status': 'error',
+                'message': f'Ошибка получения версии: {error_message}',
+                'response': response
+            }
+            log_json("ОТПРАВЛЕН JSON (ошибка)", error_response)
+            return jsonify(error_response), 400
 
     except Exception as e:
         error_response = {
@@ -237,9 +299,103 @@ def get_devices():
         response = connector.send_command("listconnect", "")
         log_json("ПОЛУЧЕН ОТВЕТ ОТ MOTORCONTROLSERVICE", response)
         
+        # Извлекаем список устройств из ответа
+        devices = []
+        if 'subMessage' in response and response['subMessage']:
+            try:
+                sub_message = json.loads(response['subMessage'])
+                if 'listConnect' in sub_message:
+                    devices = sub_message['listConnect']
+            except:
+                pass
+        
         success_response = {
             'status': 'success',
             'message': 'Список устройств получен',
+            'devices': devices,
+            'response': response
+        }
+        log_json("ОТПРАВЛЕН JSON (успех)", success_response)
+        return jsonify(success_response)
+
+    except Exception as e:
+        error_response = {
+            'status': 'error',
+            'message': str(e)
+        }
+        log_json("ОТПРАВЛЕН JSON (ошибка)", error_response)
+        return jsonify(error_response), 500
+
+@app.route('/api/system/connect-device', methods=['POST'])
+def connect_to_device():
+    """Подключение к устройству"""
+    try:
+        data = request.get_json()
+        log_json("ПОЛУЧЕН JSON (подключение к устройству)", data)
+        
+        device_id = data.get('deviceId', 0)
+        
+        ensure_connection()
+        response = connector.send_command("reconnect", json.dumps({"deviceId": device_id}))
+        log_json("ПОЛУЧЕН ОТВЕТ ОТ MOTORCONTROLSERVICE", response)
+        
+        success_response = {
+            'status': 'success',
+            'message': f'Подключено к устройству ID: {device_id}',
+            'deviceId': device_id,
+            'deviceName': f'Device_{device_id}',
+            'response': response
+        }
+        log_json("ОТПРАВЛЕН JSON (успех)", success_response)
+        return jsonify(success_response)
+
+    except Exception as e:
+        error_response = {
+            'status': 'error',
+            'message': str(e)
+        }
+        log_json("ОТПРАВЛЕН JSON (ошибка)", error_response)
+        return jsonify(error_response), 500
+
+@app.route('/api/system/disconnect-device', methods=['POST'])
+def disconnect_from_device():
+    """Отключение от устройства"""
+    try:
+        log_json("ПОЛУЧЕН ЗАПРОС (отключение от устройства)", {})
+        
+        ensure_connection()
+        response = connector.send_command("disconnect", "")
+        log_json("ПОЛУЧЕН ОТВЕТ ОТ MOTORCONTROLSERVICE", response)
+        
+        success_response = {
+            'status': 'success',
+            'message': 'Отключено от устройства',
+            'response': response
+        }
+        log_json("ОТПРАВЛЕН JSON (успех)", success_response)
+        return jsonify(success_response)
+
+    except Exception as e:
+        error_response = {
+            'status': 'error',
+            'message': str(e)
+        }
+        log_json("ОТПРАВЛЕН JSON (ошибка)", error_response)
+        return jsonify(error_response), 500
+
+@app.route('/api/motor/stop-all', methods=['POST'])
+def stop_all_motors():
+    """Остановка всех моторов"""
+    try:
+        log_json("ПОЛУЧЕН JSON (остановка всех моторов)", request.get_json() or {})
+        
+        ensure_connection()
+        response = connector.send_command("stop", "")
+        log_json("ПОЛУЧЕН ОТВЕТ ОТ MOTORCONTROLSERVICE", response)
+        
+        success_response = {
+            'status': 'success',
+            'message': 'Все моторы остановлены',
             'response': response
         }
         log_json("ОТПРАВЛЕН JSON (успех)", success_response)

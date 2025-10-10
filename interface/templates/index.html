@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotorManagerService - Управление моторами</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1><i class="fas fa-cogs"></i> MotorManagerService</h1>
+            <div class="connection-panel">
+                <div class="connection-inputs">
+                    <div class="input-group">
+                        <label for="serverIP">IP:</label>
+                        <input type="text" id="serverIP" value="127.0.0.1" placeholder="IP адрес">
+                    </div>
+                    <div class="input-group">
+                        <label for="serverPort">PORT:</label>
+                        <input type="number" id="serverPort" value="38000" placeholder="Порт">
+                    </div>
+                </div>
+                <button id="connectBtn" class="btn btn-primary">
+                    <i class="fas fa-plug"></i> Подключиться
+                </button>
+                <span class="status-indicator" id="serverStatus">
+                    <i class="fas fa-circle"></i> Отключен
+                </span>
+            </div>
+        </header>
+
+        <!-- Подключение к устройству -->
+        <section class="device-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-plug"></i> Подключение к устройству</h2>
+            </div>
+            <div class="device-controls">
+                <div class="device-info">
+                    <div class="info-item">
+                        <label>ID:</label>
+                        <span id="deviceId">0</span>
+                    </div>
+                    <div class="info-item">
+                        <label>NAME:</label>
+                        <span id="deviceName">Не подключено</span>
+                    </div>
+                    <div class="info-item">
+                        <label>VERSION:</label>
+                        <span id="deviceVersion">Неизвестно</span>
+                    </div>
+                </div>
+                <div class="device-actions">
+                    <button id="refreshDevices" class="btn btn-secondary">
+                        <i class="fas fa-sync-alt"></i> Обновить устройства
+                    </button>
+                    <button id="getVersion" class="btn btn-info">
+                        <i class="fas fa-info-circle"></i> Получить версию
+                    </button>
+                    <button id="connectDevice" class="btn btn-primary" disabled>
+                        <i class="fas fa-link"></i> Подключиться к устройству
+                    </button>
+                    <button id="disconnectDevice" class="btn btn-danger" disabled>
+                        <i class="fas fa-unlink"></i> Отключиться
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Управление моторами -->
+        <section class="motors-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-motorcycle"></i> Управление моторами</h2>
+            </div>
+            
+            <div class="motors-table-container">
+                <table class="motors-table">
+                    <thead>
+                        <tr>
+                            <th>Выбор</th>
+                            <th>Мотор</th>
+                            <th>Ускорение</th>
+                            <th>Макс. скорость</th>
+                            <th>Шаг</th>
+                            <th>Действие</th>
+                        </tr>
+                    </thead>
+                    <tbody id="motorsTableBody">
+                        <!-- Моторы будут добавлены динамически -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Глобальные команды -->
+            <div class="global-controls">
+                <div class="global-buttons">
+                    <button id="moveSelectedSync" class="btn btn-success">
+                        <i class="fas fa-play"></i> Запустить выбранные (синхронно)
+                    </button>
+                    <button id="moveSelectedAsync" class="btn btn-info">
+                        <i class="fas fa-play"></i> Запустить выбранные (асинхронно)
+                    </button>
+                    <button id="stopAll" class="btn btn-danger">
+                        <i class="fas fa-stop"></i> Остановить все
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Мониторинг системы -->
+        <section class="monitoring-panel">
+            <div class="panel-header">
+                <h2><i class="fas fa-chart-line"></i> Мониторинг системы</h2>
+                <div class="monitoring-controls">
+                    <button id="clearLogs" class="btn btn-secondary">
+                        <i class="fas fa-trash"></i> Очистить логи
+                    </button>
+                </div>
+            </div>
+            
+            <div class="monitoring-content">
+                <div class="system-status">
+                    <h3>Статус системы</h3>
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <span class="status-label">Сервер:</span>
+                            <span id="serverStatusText" class="status-value">Неизвестно</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">MCU:</span>
+                            <span id="mcuStatus" class="status-value">Неизвестно</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Устройство:</span>
+                            <span id="deviceStatusText" class="status-value">Неизвестно</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="logs-section">
+                    <h3>Логи операций</h3>
+                    <div class="logs-container" id="logsContainer">
+                        <div class="log-entry info">
+                            <span class="log-time">[00:00:00]</span>
+                            <span class="log-level">INFO</span>
+                            <span class="log-message">Система инициализирована. Ожидание подключения...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Уведомления -->
+    <div id="notifications" class="notifications-container"></div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
