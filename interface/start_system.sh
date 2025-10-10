@@ -29,7 +29,7 @@ print_error() {
 }
 
 print_warning() {
-    echo -e "${YELLOW}⚠ $1${NC}"
+    echo -e "${YELLOW}WARNING: $1${NC}"
 }
 
 print_info() {
