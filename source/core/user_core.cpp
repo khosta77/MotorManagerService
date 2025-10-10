@@ -1,6 +1,7 @@
 #include "user_core.hpp"
 #include <thread>
 #include <chrono>
+#include <algorithm>
 
 UserCore::~UserCore() {}
 
@@ -437,7 +438,34 @@ void UserCore::listconnect(const uinfo &u, const std::string &message)
         return;
 
     mms::ListConnect list;
-    list.listConnect = m_module->listComs();
+    auto rawDevices = m_module->listComs();
+    
+    // Очистка и валидация строк для корректного UTF-8
+    for (const auto& device : rawDevices) {
+        std::string cleanDevice = device;
+        
+        // Удаляем невалидные UTF-8 символы (символы с кодом > 127)
+        cleanDevice.erase(std::remove_if(cleanDevice.begin(), cleanDevice.end(),
+            [](char c) { 
+                return static_cast<unsigned char>(c) > 127; 
+            }), cleanDevice.end());
+        
+        // Дополнительная проверка на наличие обратных кавычек (0x60)
+        cleanDevice.erase(std::remove_if(cleanDevice.begin(), cleanDevice.end(),
+            [](char c) { 
+                return c == 0x60; // Удаляем обратные кавычки
+            }), cleanDevice.end());
+        
+        // Если строка не пустая после очистки, добавляем её
+        if (!cleanDevice.empty()) {
+            list.listConnect.push_back(cleanDevice);
+        }
+    }
+    
+    // Если нет устройств, добавляем заглушку
+    if (list.listConnect.empty()) {
+        list.listConnect.push_back("No devices found");
+    }
 
     pkg::Status ok_;
     ok_.status = 0;
