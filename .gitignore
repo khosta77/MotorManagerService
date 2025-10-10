@@ -17,9 +17,6 @@ Makefile
 *__pycache__/
 venv/
 
-# something
-*.html
-
 #protobuf
 *.pb.*
 
