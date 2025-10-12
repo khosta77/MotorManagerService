@@ -3,6 +3,8 @@
 #include <chrono>
 #include <algorithm>
 
+using namespace std::chrono_literals;
+
 UserCore::~UserCore() {}
 
 void UserCore::Init()
@@ -28,7 +30,7 @@ std::optional<pkg::Message> UserCore::deserializeMessage(const uinfo &u, const s
         pkg::Status merr_;
         merr_.status = 40401; // TODO(khosta77): #001
         merr_.what = std::format("[{}]: The message is correct({})", u.second, message);
-        merr_.subMessage = "";
+        merr_.subMessage = "pkg::Message";
         writeToSock(u.first, serialize(merr_));
         return {};
     }
@@ -47,7 +49,7 @@ std::optional<mms::Manager> UserCore::deserializeManager(const uinfo &u, const s
         pkg::Status merr_;
         merr_.status = 40401; // TODO(khosta77): #001
         merr_.what = std::format("[{}]: The message is correct({})", u.second, text);
-        merr_.subMessage = "";
+        merr_.subMessage = "mms::Manager";
         writeToSock(u.first, serialize(merr_));
         return {};
     }
@@ -256,6 +258,8 @@ void UserCore::version(const uinfo &u, const std::string &message)
 
     std::vector<uint8_t> data = {0b00100000}; // Команда запроса версии прошивки
     m_module->writeData(data);
+    data[0] = 0x00;
+    std::this_thread::sleep_for(100ms);
     m_module->readData(data);
 
     uint8_t versionByte = data[0];
@@ -285,79 +289,112 @@ void UserCore::moving(const uinfo &u, const std::string &message)
 
     if (checkMode(u, motorsSettings_.value()) || checkMotors(u, motorsSettings_.value()))
         return;
-    
-    const auto& settings = motorsSettings_.value();
+
+    const auto &settings = motorsSettings_.value();
     const size_t motorCount = settings.motors.size();
-    
+
     uint8_t commandByte;
-    if (settings.mode == "synchronous") {
+    if (settings.mode == "synchronous")
+    {
         commandByte = 0x80 | static_cast<uint8_t>(motorCount); // 0x8N
-    } else { // asynchronous
+    }
+    else
+    {                                                          // asynchronous
         commandByte = 0x40 | static_cast<uint8_t>(motorCount); // 0x4N
     }
-    
+
     std::vector<uint8_t> commandData = {commandByte};
     m_module->writeData(commandData);
-    
-    std::vector<uint8_t> readinessResponse(1);
-    m_module->readData(readinessResponse);
-    
+    std::vector<uint8_t> readinessResponse(1, 0);
+
+    size_t timeoutMs = 5000; // 5 секунд
+    size_t elapsedMs = 0;
+    const size_t checkIntervalMs = 100;
+    while (elapsedMs < timeoutMs)
+    {
+        size_t availableBytes = m_module->checkRXChannel();
+        std::cout << std::format("\tсообщение: {}\n", availableBytes);
+        if (availableBytes >= 1)
+        {
+            m_module->readData(readinessResponse);
+            break;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(checkIntervalMs));
+        elapsedMs += checkIntervalMs;
+    }
+
     uint8_t readinessCode = readinessResponse[0];
-    if (readinessCode != 0x00) {
+    if (readinessCode != 0x00)
+    {
         pkg::Status errorResponse;
         errorResponse.status = 40512; // MCU readiness error
-        errorResponse.what = std::format("[{}]: MCU readiness error: 0x{:02X}", u.second, readinessCode);
+        errorResponse.what = std::format("[{}][40512]: MCU readiness error: {}", u.second, readinessCode);
         errorResponse.subMessage = "";
         writeToSock(u.first, serialize(errorResponse));
         return;
     }
-    
+
     std::vector<uint8_t> motorData;
     motorData.reserve(motorCount * 16); // 4 параметра × 4 байта на мотор
-    
-    for (const auto& motor : settings.motors) {
+
+    for (const auto &motor : settings.motors)
+    {
         uint32_t number = static_cast<uint32_t>(motor.number);
-        motorData.insert(motorData.end(), 
-            reinterpret_cast<uint8_t*>(&number), 
-            reinterpret_cast<uint8_t*>(&number) + 4);
-        
+        motorData.insert(
+            motorData.end(),
+            reinterpret_cast<uint8_t *>(&number),
+            reinterpret_cast<uint8_t *>(&number) + 4);
+
         uint32_t acceleration = motor.acceleration;
-        motorData.insert(motorData.end(), 
-            reinterpret_cast<uint8_t*>(&acceleration), 
-            reinterpret_cast<uint8_t*>(&acceleration) + 4);
-        
+        motorData.insert(
+            motorData.end(),
+            reinterpret_cast<uint8_t *>(&acceleration),
+            reinterpret_cast<uint8_t *>(&acceleration) + 4);
+
         uint32_t maxSpeed = motor.maxSpeed;
-        motorData.insert(motorData.end(), 
-            reinterpret_cast<uint8_t*>(&maxSpeed), 
-            reinterpret_cast<uint8_t*>(&maxSpeed) + 4);
-        
+        motorData.insert(
+            motorData.end(),
+            reinterpret_cast<uint8_t *>(&maxSpeed),
+            reinterpret_cast<uint8_t *>(&maxSpeed) + 4);
+
         uint32_t step = static_cast<uint32_t>(motor.step);
-        motorData.insert(motorData.end(), 
-            reinterpret_cast<uint8_t*>(&step), 
-            reinterpret_cast<uint8_t*>(&step) + 4);
+        motorData.insert(
+            motorData.end(),
+            reinterpret_cast<uint8_t *>(&step),
+            reinterpret_cast<uint8_t *>(&step) + 4);
     }
-    
+
     m_module->writeData(motorData);
-    
-    std::vector<uint8_t> completionResponse(1);
-    
+    std::this_thread::sleep_for(200ms);
+
+    std::vector<uint8_t> completionResponse(2);
+
     // Простая реализация таймаута через проверку доступных данных
     // В реальной реализации здесь должен быть более сложный механизм таймаута
-    size_t timeoutMs = 5000; // 5 секунд
-    size_t elapsedMs = 0;
-    const size_t checkIntervalMs = 100;
-    while (elapsedMs < timeoutMs) {
+    elapsedMs = 0;
+    while (elapsedMs < timeoutMs)
+    {
         size_t availableBytes = m_module->checkRXChannel();
-        if (availableBytes >= 1) {
+        std::cout << std::format("\t\tсообщение: {}\n", availableBytes);
+        if (availableBytes >= 2)
+        {
             m_module->readData(completionResponse);
             break;
         }
-        
+
         std::this_thread::sleep_for(std::chrono::milliseconds(checkIntervalMs));
         elapsedMs += checkIntervalMs;
     }
-    
-    if (elapsedMs >= timeoutMs) {
+
+    for (int i = 0; i < completionResponse.size(); ++i)
+    {
+        printf("%02x ", completionResponse[i]);
+    }
+    printf("\n");
+
+    if (elapsedMs >= timeoutMs)
+    {
         // Таймаут ожидания ответа от MCU
         pkg::Status errorResponse;
         errorResponse.status = 40511; // Timeout waiting for MCU response
@@ -367,17 +404,19 @@ void UserCore::moving(const uinfo &u, const std::string &message)
         return;
     }
 
-    uint8_t completionCode = completionResponse[0];
-    if (completionCode != 0xFF) {
+    uint8_t completionCode = completionResponse[1];
+    if (completionCode != 0xFF)
+    {
         // Ошибка выполнения на MCU
         pkg::Status errorResponse;
         errorResponse.status = 40513; // MCU execution error
-        errorResponse.what = std::format("[{}]: MCU execution error: 0x{:02X}", u.second, completionCode);
+        errorResponse.what =
+            std::format("[{}][40513]: MCU execution error: 0x{:02X}", u.second, completionCode);
         errorResponse.subMessage = "";
         writeToSock(u.first, serialize(errorResponse));
         return;
     }
-    
+
     pkg::Status successResponse;
     successResponse.status = 0;
     successResponse.what = "";
@@ -439,31 +478,40 @@ void UserCore::listconnect(const uinfo &u, const std::string &message)
 
     mms::ListConnect list;
     auto rawDevices = m_module->listComs();
-    
+
     // Очистка и валидация строк для корректного UTF-8
-    for (const auto& device : rawDevices) {
+    for (const auto &device : rawDevices)
+    {
         std::string cleanDevice = device;
-        
+
         // Удаляем невалидные UTF-8 символы (символы с кодом > 127)
-        cleanDevice.erase(std::remove_if(cleanDevice.begin(), cleanDevice.end(),
-            [](char c) { 
-                return static_cast<unsigned char>(c) > 127; 
-            }), cleanDevice.end());
-        
+        cleanDevice.erase(
+            std::remove_if(
+                cleanDevice.begin(),
+                cleanDevice.end(),
+                [](char c) { return static_cast<unsigned char>(c) > 127; }),
+            cleanDevice.end());
+
         // Дополнительная проверка на наличие обратных кавычек (0x60)
-        cleanDevice.erase(std::remove_if(cleanDevice.begin(), cleanDevice.end(),
-            [](char c) { 
-                return c == 0x60; // Удаляем обратные кавычки
-            }), cleanDevice.end());
-        
+        cleanDevice.erase(
+            std::remove_if(
+                cleanDevice.begin(),
+                cleanDevice.end(),
+                [](char c) {
+                    return c == 0x60; // Удаляем обратные кавычки
+                }),
+            cleanDevice.end());
+
         // Если строка не пустая после очистки, добавляем её
-        if (!cleanDevice.empty()) {
+        if (!cleanDevice.empty())
+        {
             list.listConnect.push_back(cleanDevice);
         }
     }
-    
+
     // Если нет устройств, добавляем заглушку
-    if (list.listConnect.empty()) {
+    if (list.listConnect.empty())
+    {
         list.listConnect.push_back("No devices found");
     }
 
