@@ -48,15 +48,18 @@ class ServerConnector:
         self.socket.sendall(data.encode('utf-8'))
         print(f"Sent name: {name_to_send}")
 
-    def send_command(self, command, message):
+    def send_command(self, command: str, message: str):
         """Отправляет команду и возвращает ответ"""
         if not self.socket:
             raise ValidationError(f'Not socket {self.socket}')
 
         message_id = random.randint(0, 999999)
         
-        # Создаем команду как строку напрямую, избегая двойного JSON encoding
-        command_text = f'{{"command": "{command}", "message": "{message}"}}'
+        # Правильно экранируем message для JSON
+        escaped_message = json.dumps(message)  # Это автоматически экранирует кавычки
+        
+        # Создаем команду как строку напрямую
+        command_text = f'{{"command": "{command}", "message": {escaped_message}}}'
         
         # Создаем внешний объект
         outer_command = {"id": message_id, "text": command_text}
@@ -67,7 +70,7 @@ class ServerConnector:
         print(f"Sending command: {command}")
         print(f"Message: {message}")
         print(f"Data: {data}")
-        
+
         # Отправляем как UTF-8
         try:
             self.socket.sendall(data.encode('utf-8'))

@@ -33,7 +33,6 @@ def ensure_connection():
             # Подключаемся к FT232RL устройству
             try:
                 connector.send_command("listconnect", "")
-                connector.send_command("reconnect", json.dumps({"deviceId": 0}))
             except Exception as e:
                 print(f"Warning: Could not auto-connect to device: {e}")
         else:
@@ -336,7 +335,7 @@ def connect_to_device():
         device_id = data.get('deviceId', 0)
         
         ensure_connection()
-        response = connector.send_command("reconnect", json.dumps({"deviceId": device_id}))
+        response = connector.send_command("reconnect", str(json.dumps({"deviceId": device_id})))
         log_json("ПОЛУЧЕН ОТВЕТ ОТ MOTORCONTROLSERVICE", response)
         
         success_response = {
