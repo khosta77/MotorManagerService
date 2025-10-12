@@ -1,6 +1,6 @@
 #include "ft232rl.hpp"
 
-FT232RL::FT232RL() : m_deviceId(-1), m_baudrate(9600), m_connected(false) {}
+FT232RL::FT232RL() : m_deviceId(-1), m_baudrate(115200), m_connected(false) {}
 FT232RL::~FT232RL()
 {
     disconnect();
@@ -224,6 +224,7 @@ void FT232RL::readData(std::vector<uchar> &frame)
 
     if (FT_STATUS code = FT_Read(ftHandle, frame.data(), SIZE, &BytesReceived); code != FT_OK)
         throw ModuleFT2xxException(code);
+    FT_Purge(ftHandle, FT_PURGE_RX | FT_PURGE_TX);
 }
 
 std::vector<uchar> FT232RL::read(const size_t timeout)
